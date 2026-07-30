@@ -1,7 +1,8 @@
 """
 Pydantic schemas — these are the request/response contracts for the API.
 Kept separate from the SQLAlchemy models (app/models/registry.py) on purpose:
-DB models describe storage, these describe the wire format.
+DB models describe storage, these describe the wire format. Mixing them
+gets messy fast once you add computed fields or hide internal columns.
 """
 
 from datetime import datetime
@@ -9,7 +10,7 @@ from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field
 
-from app.models.registry import ModelType, ModelStage
+from app.models.registry import ModelType, ModelStage, RiskTier
 
 
 class ModelCreate(BaseModel):
@@ -18,6 +19,7 @@ class ModelCreate(BaseModel):
     model_type: ModelType
     use_case: str
     owner: str
+    risk_tier: RiskTier = RiskTier.MEDIUM
     extra_metadata: Optional[Dict[str, Any]] = None
 
 
@@ -49,6 +51,7 @@ class ModelResponse(BaseModel):
     use_case: str
     owner: str
     stage: ModelStage
+    risk_tier: RiskTier
     efficiency_score: Optional[float]
     adoption_score: Optional[float]
     input_quality_score: Optional[float]
@@ -76,6 +79,7 @@ class ApprovalEventResponse(BaseModel):
     to_stage: ModelStage
     approved_by: str
     comment: Optional[str]
+    is_emergency: bool = False
     created_at: datetime
 
     class Config:
