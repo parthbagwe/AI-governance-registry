@@ -9,7 +9,7 @@ from app.schemas import (
     ModelCreate, ModelResponse, ScoreUpdate, ApprovalRequest,
     MetricCreate, MetricResponse, ApprovalEventResponse, LineageResponse,
 )
-from app.workflow import validate_transition, InvalidTransitionError, GovernanceGateError
+from app.workflow import validate_transition, InvalidTransitionError, GovernanceGateError, kill_switch
 
 router = APIRouter()
 
@@ -84,7 +84,7 @@ def approve_transition(model_id: str, payload: ApprovalRequest, db: Session = De
     model = _get_model_or_404(db, model_id)
 
     try:
-        validate_transition(model.stage, payload.to_stage, model.governance_score)
+        validate_transition(model.stage, payload.to_stage, model.governance_score, model.risk_tier)
     except InvalidTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except GovernanceGateError as e:
@@ -95,6 +95,37 @@ def approve_transition(model_id: str, payload: ApprovalRequest, db: Session = De
         approved_by=payload.approved_by, comment=payload.comment,
     ))
     model.stage = payload.to_stage
+    db.commit()
+    db.refresh(model)
+    return _to_response(model)
+
+
+@router.post("/models/{model_id}/kill-switch", response_model=ModelResponse)
+def emergency_kill_switch(model_id: str, reason: str, triggered_by: str, db: Session = Depends(get_db)):
+    """
+    Emergency override: immediately deactivates a model regardless of its
+    current stage, with NO governance-score check and NO respect for the
+    normal ALLOWED_TRANSITIONS map. This exists specifically because RBI's
+    draft Model Risk Management guidance mandates an override/suspension/
+    kill-switch mechanism independent of routine approval workflow.
+
+    Deliberately a separate endpoint from /approve, not a parameter on it —
+    an emergency stop should never be reachable by the same form a routine
+    reviewer fills in; it needs its own explicit, harder-to-hit-by-accident door.
+    """
+    model = _get_model_or_404(db, model_id)
+
+    try:
+        new_stage = kill_switch(reason)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db.add(ApprovalEvent(
+        model_id=model.id, from_stage=model.stage, to_stage=new_stage,
+        approved_by=triggered_by, comment=f"[EMERGENCY KILL-SWITCH] {reason}",
+        is_emergency=True,
+    ))
+    model.stage = new_stage
     db.commit()
     db.refresh(model)
     return _to_response(model)
@@ -139,3 +170,27 @@ def get_lineage(model_id: str, db: Session = Depends(get_db)):
     """Which source tables/features fed this model version."""
     _get_model_or_404(db, model_id)
     return db.query(DataLineage).filter(DataLineage.model_id == model_id).all()
+
+
+@router.post("/models/{model_id}/explain")
+def explain_prediction(model_id: str, applicant: dict, db: Session = Depends(get_db)):
+    """
+    Only meaningful for sme-credit-scorer today, but deliberately placed on
+    the generic model route (not a standalone script) since RBI's draft
+    guidance treats explainability as a first-class requirement of the
+    model itself, not an optional side tool a data scientist runs manually.
+    """
+    model = _get_model_or_404(db, model_id)
+    if model.name != "sme-credit-scorer":
+        raise HTTPException(status_code=400, detail="Explainability is only wired up for sme-credit-scorer in this prototype.")
+
+    from app.ml.explain import explain_applicant
+    prob, contributions = explain_applicant(applicant)
+    return {
+        "predicted_default_probability": round(float(prob), 4),
+        "decision": "FLAGGED AS HIGHER RISK" if prob > 0.5 else "LOOKS OKAY",
+        "top_factors": [
+            {"feature": f, "value": float(v), "impact": float(c), "direction": "increased_risk" if c > 0 else "decreased_risk"}
+            for f, v, c in contributions
+        ],
+    }
