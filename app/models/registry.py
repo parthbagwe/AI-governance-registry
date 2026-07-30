@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Float, DateTime, ForeignKey, Enum, Text, JSON, Integer
+    Column, String, Float, DateTime, ForeignKey, Enum, Text, JSON, Integer, Boolean
 )
 from sqlalchemy.orm import relationship
 
@@ -38,6 +38,18 @@ class ModelStage(str, enum.Enum):
     DEPRECATED = "deprecated"
 
 
+class RiskTier(str, enum.Enum):
+    """
+    Mirrors RBI's June 2026 draft Guidance on Regulatory Principles for
+    Model Risk Management: models are tiered by how much their output can
+    impact consumers, financial performance, or compliance. Higher tiers
+    face a higher governance-score bar before production (see workflow.py).
+    """
+    LOW = "low"           # e.g. an internal FAQ bot
+    MEDIUM = "medium"      # e.g. a marketing lead-scoring model
+    HIGH = "high"          # e.g. credit decisions, fraud blocking — directly affects customers' money
+
+
 class MLModel(Base):
     """
     One row per *model version*. A model "name" can have many versions
@@ -52,6 +64,7 @@ class MLModel(Base):
     use_case = Column(String, nullable=False)                   # e.g. "SME loan pre-approval"
     owner = Column(String, nullable=False)                      # team/person responsible
     stage = Column(Enum(ModelStage), nullable=False, default=ModelStage.PILOT)
+    risk_tier = Column(Enum(RiskTier), nullable=False, default=RiskTier.MEDIUM)
 
     # Governance scorecard fields (mirrors a "pilot -> production" evaluation framework:
     # efficiency, adoption, input data quality, cost reduction, revenue impact)
@@ -113,6 +126,7 @@ class ApprovalEvent(Base):
     to_stage = Column(Enum(ModelStage), nullable=False)
     approved_by = Column(String, nullable=False)
     comment = Column(Text, nullable=True)
+    is_emergency = Column(Boolean, nullable=False, default=False)  # True = kill-switch override, not a normal approval
     created_at = Column(DateTime, default=datetime.utcnow)
 
     model = relationship("MLModel", back_populates="approval_events")
