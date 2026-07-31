@@ -1,0 +1,23 @@
+# Core web/DB stack
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.9
+sqlalchemy>=2.0
+httpx>=0.27
+
+# ML
+xgboost>=2.0
+scikit-learn>=1.5
+pandas>=2.2
+numpy>=1.26
+
+# Drift detection
+evidently>=0.4
+
+# Explainability
+shap>=0.44
+
+# Dashboard
+streamlit>=1.38
+plotly>=5.22
+requests>=2.32
