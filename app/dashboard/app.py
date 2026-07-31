@@ -28,6 +28,13 @@ SCORE_LABELS = {
 }
 
 
+RISK_TIER_DISPLAY = {
+    "low": ("🟩 Low Risk", "Limited impact if something goes wrong (e.g. an internal chatbot)."),
+    "medium": ("🟨 Medium Risk", "Some business impact if something goes wrong (e.g. a marketing model)."),
+    "high": ("🟥 High Risk", "Directly affects customers' money — held to the strictest approval bar."),
+}
+
+
 def score_traffic_light(score):
     """Convert a 0-10 score into a plain traffic-light judgment."""
     if score is None:
@@ -147,6 +154,10 @@ with col1:
     )
     st.caption(stage_desc)
 
+    risk_label, risk_desc = RISK_TIER_DISPLAY.get(selected["risk_tier"], (selected["risk_tier"], ""))
+    st.markdown(f"**Risk level:** {risk_label}")
+    st.caption(risk_desc)
+
 with col2:
     gscore = selected["governance_score"]
     emoji, verdict = score_traffic_light(gscore)
@@ -199,8 +210,55 @@ else:
 st.divider()
 
 # ===================================================================
-# GOVERNANCE ACTIONS — guided, not free-form
+# EXPLAIN A DECISION — addresses "no black-box AI" requirement
 # ===================================================================
+if selected["name"] == "sme-credit-scorer":
+    st.subheader("🔬 Why Would This Model Approve or Reject Someone?")
+    st.caption(
+        "Regulators now require that AI credit decisions can be explained in plain terms, "
+        "not just produced by a black box. Try a sample applicant below."
+    )
+
+    with st.form("explain_form"):
+        c1, c2, c3 = st.columns(3)
+        turnover = c1.number_input("Monthly business turnover (₹)", value=850000, step=50000)
+        filing_delay = c1.number_input("GST filing delay (days)", value=12, step=1)
+        itc_ratio = c2.slider("Input tax credit claim ratio", 0.0, 1.0, 0.55)
+        balance = c2.number_input("Average bank balance (₹)", value=95000, step=5000)
+        volatility = c3.slider("Income volatility", 0.0, 2.0, 0.6)
+        bounces = c3.number_input("Bounced payments (last 90 days)", value=2, step=1, min_value=0)
+        explain_submit = st.form_submit_button("Explain This Applicant")
+
+    if explain_submit:
+        sme_id = model_names.get("sme-credit-scorer", selected)["id"]
+        resp = requests.post(
+            f"{API_BASE}/models/{sme_id}/explain",
+            json={
+                "avg_monthly_turnover": turnover, "filing_delay_days": filing_delay,
+                "itc_claim_ratio": itc_ratio, "avg_balance": balance,
+                "inflow_volatility": volatility, "bounce_count_90d": bounces,
+            },
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            verdict_color = "#ef4444" if result["decision"] == "FLAGGED AS HIGHER RISK" else "#22c55e"
+            st.markdown(
+                f"<div style='background-color:{verdict_color}22; border:1px solid {verdict_color}55; "
+                f"border-radius:10px; padding:14px;'>"
+                f"<b>Predicted risk of default: {result['predicted_default_probability']:.1%}</b><br>"
+                f"Decision: <b>{result['decision']}</b></div>",
+                unsafe_allow_html=True,
+            )
+            st.write("**Top reasons behind this decision:**")
+            for factor in result["top_factors"]:
+                arrow = "🔺 increased risk" if factor["direction"] == "increased_risk" else "🔻 decreased risk"
+                st.write(f"- **{factor['feature'].replace('_', ' ').title()}** = {factor['value']:.2f} — {arrow}")
+        else:
+            st.error(f"Couldn't generate an explanation: {resp.json().get('detail')}")
+
+    st.divider()
+
+
 st.subheader("⚙️ Change This Model's Status")
 
 action_options = {
@@ -214,11 +272,15 @@ chosen_action_label = st.radio("What would you like to do?", list(action_options
 target_stage = action_options[chosen_action_label]
 
 # Pre-emptive plain-English warning BEFORE they click, so it's not a surprise
-if target_stage == "production" and (gscore is None or gscore < 7):
+TIER_THRESHOLDS = {"low": 5.0, "medium": 7.0, "high": 8.5}
+required_score = TIER_THRESHOLDS.get(selected["risk_tier"], 7.0)
+if target_stage == "production" and (gscore is None or gscore < required_score):
     st.warning(
         f"⚠️ Heads up: this model's health score is "
         f"{'not yet available' if gscore is None else f'{gscore}/10'}, which is below the "
-        f"7/10 needed to go live. The system will likely block this request — that's intentional, "
+        f"{required_score}/10 needed for a **{selected['risk_tier']}-risk** model to go live "
+        f"(higher-risk models face a stricter bar). "
+        f"The system will likely block this request — that's intentional, "
         f"it's protecting against pushing an unready model into real use."
     )
 
@@ -253,7 +315,8 @@ with hist_col:
     for event in reversed(history):
         from_label = STAGE_DISPLAY.get(event["from_stage"], ("New model", "", ""))[0] if event["from_stage"] else "Newly registered"
         to_label = STAGE_DISPLAY.get(event["to_stage"], (event["to_stage"], "", ""))[0]
-        st.write(f"**{event['created_at'][:10]}** — {from_label} → {to_label}")
+        emergency_tag = " 🚨 **EMERGENCY OVERRIDE**" if event.get("is_emergency") else ""
+        st.write(f"**{event['created_at'][:10]}** — {from_label} → {to_label}{emergency_tag}")
         st.caption(f"By: {event['approved_by']}" + (f" — \"{event['comment']}\"" if event["comment"] else ""))
 
 with lineage_col:
@@ -266,3 +329,31 @@ with lineage_col:
             st.caption("Uses: " + ", ".join(l["features_used"]))
     else:
         st.info("No data sources recorded for this model.")
+
+st.divider()
+
+# ===================================================================
+# EMERGENCY KILL SWITCH — deliberately separate from the normal
+# governance-action flow above, with its own confirmation, since
+# regulators require an override that works no matter what stage a
+# model is in and shouldn't be reachable by an accidental click.
+# ===================================================================
+with st.expander("🚨 Emergency Kill Switch (immediately shut this model down)"):
+    st.error(
+        "This immediately switches the model off, regardless of its current status or score. "
+        "Use this only for a genuine emergency (e.g. a serious error or safety concern discovered "
+        "in production) — every use is permanently logged as an emergency override."
+    )
+    kill_reason = st.text_area("Reason for shutting this down (required)")
+    kill_by = st.text_input("Your name", value="", key="kill_switch_name")
+    kill_confirm = st.checkbox("I understand this cannot be undone and will be logged as an emergency action.")
+    if st.button("🚨 Shut Down Immediately", type="primary", disabled=not (kill_reason.strip() and kill_by and kill_confirm)):
+        resp = requests.post(
+            f"{API_BASE}/models/{model_id}/kill-switch",
+            params={"reason": kill_reason, "triggered_by": kill_by},
+        )
+        if resp.status_code == 200:
+            st.success(f"🚨 Model has been shut down. Status is now: {STAGE_DISPLAY[resp.json()['stage']][0]}")
+            st.cache_data.clear()
+        else:
+            st.error(f"Couldn't complete kill switch: {resp.json().get('detail')}")
