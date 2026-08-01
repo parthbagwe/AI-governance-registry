@@ -55,8 +55,6 @@ if __name__ == "__main__":
     df_train = generate_sme_data(5000, drift=False)
     df_train.to_csv("data_train.csv", index=False)
     print(f"✅ Training data: {len(df_train)} rows, default rate = {df_train['defaulted'].mean():.2%}")
-
-    # "current" production-time data, post-drift (simulates a few months later)
     df_current = generate_sme_data(1000, drift=True)
     df_current.to_csv("data_current.csv", index=False)
     print(f"✅ Current (drifted) data: {len(df_current)} rows, default rate = {df_current['defaulted'].mean():.2%}")
