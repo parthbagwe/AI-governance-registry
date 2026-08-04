@@ -21,3 +21,4 @@ shap>=0.44
 streamlit>=1.38
 plotly>=5.22
 requests>=2.32
+psycopg2-binary>=2.9
