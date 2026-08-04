@@ -1,24 +1,24 @@
 """
 Database configuration.
 
-In this prototype we use SQLite (file-based, zero-setup) so the project runs
-anywhere without a Postgres server. In production this would just be:
-
-    DATABASE_URL = "postgresql://user:pass@host:5432/ai_governance"
-
-...and you'd swap JSON columns for JSONB, and Integer PKs for BIGSERIAL.
-Everything else in the schema is written to be portable between the two.
+Uses DATABASE_URL from environment if set (production/Render), otherwise
+falls back to local SQLite (for your own machine / development).
 """
 
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///./governance.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./governance.db")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}  # needed only for SQLite + FastAPI
-)
+# Render's Postgres URLs start with "postgres://" but SQLAlchemy 2.x
+# requires "postgresql://" — this line handles that automatically.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -26,7 +26,6 @@ Base = declarative_base()
 
 
 def get_db():
-    """FastAPI dependency: yields a DB session, closes it after the request."""
     db = SessionLocal()
     try:
         yield db
