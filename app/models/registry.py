@@ -14,7 +14,8 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Float, DateTime, ForeignKey, Enum, Text, JSON, Integer, Boolean
+    Column, String, Float, DateTime, ForeignKey, Enum, Text, JSON, Integer,
+    Boolean, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 
@@ -56,6 +57,16 @@ class MLModel(Base):
     (v1, v2, ...) each with its own lifecycle stage.
     """
     __tablename__ = "ml_models"
+
+    # A version is an identity, not a label. Two rows claiming to be
+    # "sme-credit-scorer v1.0.0" make the registry unable to answer its most
+    # basic question — which one is live? — and leave an auditor with two
+    # different approval histories for what is supposedly one artefact.
+    # Enforced in the database rather than only in application code, so it
+    # holds even for anything that writes to the DB directly.
+    __table_args__ = (
+        UniqueConstraint("name", "version", name="uq_model_name_version"),
+    )
 
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False, index=True)          # e.g. "sme-credit-scorer"

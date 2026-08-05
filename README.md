@@ -355,6 +355,14 @@ built yet.
   minutes went +30.6 bps and then −29.4 bps: a spike and full reversal inside
   two minutes, which is a liquidity event, someone hitting a thin book. The
   model found it unsupervised.
+- **A registry that let you register the same thing twice.** Re-running a
+  registration script created a *second* `fx-intraday-monitor v1.0.0` with a
+  different ID — because nothing enforced uniqueness on (name, version). Two
+  rows claiming to be the same version means the registry can't answer which
+  one is live, and each accumulates its own separate approval history. Fixed
+  with a database constraint plus a 409 from the API, so it holds even against
+  something writing to the DB directly. For a system whose entire job is
+  knowing what models exist, this was the worst possible bug to have.
 - **A metric that wasn't measuring anything.** Training the anomaly models
   logged `anomaly_rate`, and it came back as 1.03% every time, on different
   data. It had to: Isolation Forest's `contamination` parameter *defines* the

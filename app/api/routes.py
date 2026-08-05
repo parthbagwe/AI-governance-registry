@@ -41,7 +41,31 @@ def list_models(db: Session = Depends(get_db)):
 
 @router.post("/models", response_model=ModelResponse, status_code=201)
 def register_model(payload: ModelCreate, db: Session = Depends(get_db)):
-    """Register a new model version. Always starts life in PILOT stage."""
+    """
+    Register a new model version. Always starts life in PILOT stage.
+
+    (name, version) must be unique. Re-registering an existing version is
+    rejected with 409 rather than quietly creating a second row: a registry
+    holding two copies of "v1.0.0" can't say which one is live, and each copy
+    would accumulate its own separate approval history. If a model genuinely
+    changed, it needs a new version number — that's what version numbers are.
+    """
+    existing = (
+        db.query(MLModel)
+        .filter(MLModel.name == payload.name, MLModel.version == payload.version)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"'{payload.name}' version '{payload.version}' is already "
+                f"registered (id={existing.id}, currently '{existing.stage.value}'). "
+                f"Bump the version to register a change, or update the existing "
+                f"entry instead."
+            ),
+        )
+
     model = MLModel(**payload.model_dump())
     db.add(model)
     db.commit()

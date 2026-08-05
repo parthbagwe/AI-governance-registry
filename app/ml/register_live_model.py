@@ -49,12 +49,17 @@ def register_and_log():
         },
     })
 
-    if resp.status_code != 201:
-        print(f"⚠️  Already registered? HTTP {resp.status_code}")
+    if resp.status_code == 409:
+        # Expected on a re-run: this version already exists. Reuse it rather
+        # than creating a duplicate — the registry treats (name, version) as
+        # an identity, so a second row would be a second model.
+        print("ℹ️  Already registered — reusing the existing entry.")
         models = client.get("/api/v1/models").json()
         model = next((m for m in models if m["name"] == MODEL_NAME), None)
         if not model:
-            raise RuntimeError(f"Could not register or find {MODEL_NAME}.")
+            raise RuntimeError(f"Registry says {MODEL_NAME} exists, but it isn't listed.")
+    elif resp.status_code != 201:
+        raise RuntimeError(f"Registration failed: HTTP {resp.status_code} {resp.text}")
     else:
         model = resp.json()
 

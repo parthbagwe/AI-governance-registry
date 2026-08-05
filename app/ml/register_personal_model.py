@@ -27,12 +27,17 @@ def register_and_log():
         "owner": "risk-analytics-team",
         "risk_tier": "high",  # directly decides individual customers' credit access
     })
-    if resp.status_code != 201:
-        print(f"⚠️  Registration may have already happened: {resp.status_code} {resp.json()}")
+    if resp.status_code == 409:
+        # Expected on a re-run: this version already exists. Reuse it rather
+        # than creating a duplicate — the registry treats (name, version) as
+        # an identity, so a second row would be a second model.
+        print("ℹ️  Already registered — reusing the existing entry.")
         models = client.get("/api/v1/models").json()
         model = next((m for m in models if m["name"] == "personal-loan-credit-scorer"), None)
         if not model:
-            raise RuntimeError("Could not register or find the model.")
+            raise RuntimeError("Registry says the model exists, but it isn't listed.")
+    elif resp.status_code != 201:
+        raise RuntimeError(f"Registration failed: HTTP {resp.status_code} {resp.text}")
     else:
         model = resp.json()
 
