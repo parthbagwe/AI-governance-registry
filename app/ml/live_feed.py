@@ -1,59 +1,72 @@
 """
-Live payment-transaction feed.
+Live FX rate feed — real market data, refreshed every business day.
 
-Why a public blockchain, in a project about *banking* AI:
+Why FX, in a project about banking AI:
 
-Real cross-border payment traffic (SWIFT, RTGS, card rails) is private. There
-is no public, live feed of it, and there never will be — it's customer
-financial data. But a public blockchain is a genuinely live, legally
-observable settlement ledger: real value moving between real parties, right
-now, with fees and transaction structure visible to anyone.
+Every bank with cross-border business carries currency exposure, and a market
+risk desk watches it daily. Under the RBI's draft Model Risk Management
+guidance, market risk models sit squarely inside the model inventory that has
+to be governed — so an FX monitor is exactly the kind of model this registry
+exists to supervise.
 
-So it's used here as a *stand-in* for the kind of payment stream a bank's
-AML/fraud team monitors. The point isn't the asset class — it's that the
-monitoring loop runs against data that is actually arriving, continuously,
-rather than replaying a CSV and calling it "production traffic". Everything
-downstream (scoring, drift, auto-demotion) is identical to what you'd wire up
-against a real payment rail.
+It's also the rare case where the real data is genuinely public. ECB reference
+rates are published every business day, free, no key, no scraping. So unlike
+the credit models in this portfolio — where customer-level data is private and
+had to be simulated — this model runs on the same numbers a treasury desk
+actually looks at.
 
-Source: mempool.space public API. No key, no auth, documented and free.
-Endpoint used: GET /api/mempool/recent -> a page of transactions currently
-waiting to settle, each with {txid, fee, vsize, value}.
+What the model watches is a *day*, not a currency. One row per business day,
+with features describing how the whole exposure basket behaved: how far the
+worst mover went, whether currencies moved together or scattered, how many
+crossed a materiality threshold. A treasury analyst doesn't ask "did EUR
+move?" — they ask "was today a normal day?"
+
+Source: https://api.frankfurter.dev (ECB reference rates, no key required).
 """
 
-import time
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 import requests
 
-RECENT_URL = "https://mempool.space/api/mempool/recent"
+API_ROOT = "https://api.frankfurter.dev/v1"
 
-# The engineered features the anomaly model actually sees. Each one is a
-# recognised signal in payment monitoring, not just an available number:
+# Base currency: an Indian bank's book is denominated in INR.
+BASE = "INR"
+
+# The exposure basket. Chosen for India's actual trade and remittance
+# corridors rather than for being the largest currencies globally — HKD, SGD
+# and AED-adjacent flows matter here in a way they wouldn't for a US bank.
+BASKET = ["USD", "EUR", "GBP", "JPY", "CHF", "SGD", "AUD", "CAD", "HKD", "CNY"]
+
+# A daily move this size or larger is "material" — the threshold a desk would
+# actually escalate on, not a statistical artefact.
+MATERIAL_MOVE_PCT = 0.5
+
 FEATURES = [
-    "log_value",       # order of magnitude of the payment
-    "log_fee",         # order of magnitude of what was paid to move it
-    "vsize",           # transaction complexity — a proxy for how many
-                       # sources were combined, which is how structuring shows up
-    "fee_rate",        # fee per byte: the "urgency premium" the sender paid
-    "fee_ratio_bps",   # fee as basis points of the payment itself — paying
-                       # 500bps to move money is behaviour worth a second look
+    "max_abs_move",     # how far the single worst mover went
+    "mean_abs_move",    # how much the basket moved on average
+    "dispersion",       # did currencies move together, or scatter?
+    "usd_move",         # the dominant exposure, tracked on its own
+    "n_material_moves", # how many currencies crossed the escalation threshold
+    "basket_drift",     # signed: was INR broadly weakening or strengthening?
 ]
 
 FEATURE_LABELS = {
-    "log_value": "Payment size (order of magnitude)",
-    "log_fee": "Fee paid (order of magnitude)",
-    "vsize": "Transaction complexity",
-    "fee_rate": "Urgency premium (fee per byte)",
-    "fee_ratio_bps": "Fee as a share of the payment (bps)",
+    "max_abs_move": "Largest single-currency move (%)",
+    "mean_abs_move": "Average move across the basket (%)",
+    "dispersion": "Spread of moves — did currencies scatter? (%)",
+    "usd_move": "USD/INR move (%)",
+    "n_material_moves": f"Currencies moving more than {MATERIAL_MOVE_PCT}%",
+    "basket_drift": "Net direction of the basket (%)",
 }
 
 
-def _poll_once(timeout: float = 10.0) -> list[dict]:
-    """One page of live pending transactions. Raises on a non-200."""
+def _get(path: str, params: dict | None = None, timeout: float = 20.0) -> dict:
     resp = requests.get(
-        RECENT_URL,
+        f"{API_ROOT}{path}",
+        params=params,
         timeout=timeout,
         headers={"User-Agent": "ai-governance-registry/1.0 (portfolio project)"},
     )
@@ -61,90 +74,105 @@ def _poll_once(timeout: float = 10.0) -> list[dict]:
     return resp.json()
 
 
-def fetch_live_transactions(polls: int, delay: float = 1.2, quiet: bool = False) -> pd.DataFrame:
+def fetch_rates(start: date, end: date, quiet: bool = False) -> pd.DataFrame:
     """
-    Polls the live endpoint `polls` times, deduplicating by txid.
+    Daily ECB reference rates for the basket, as INR per unit of foreign
+    currency — the direction a desk actually quotes, so a rise means the rupee
+    weakened.
 
-    Each page only returns ~10 transactions, but the pending pool turns over
-    constantly, so repeated polls yield fresh ones. The delay is deliberate:
-    this is a free public service and hammering it would be rude, as well as
-    getting us rate-limited.
+    The API returns business days only. Weekends and holidays simply aren't
+    there, which is correct: there was no market, so there is no observation.
+    Interpolating them would be inventing data.
     """
-    seen: dict[str, dict] = {}
-    failures = 0
-
-    for i in range(polls):
-        try:
-            for tx in _poll_once():
-                seen[tx["txid"]] = tx
-        except Exception as e:  # network blips shouldn't kill a monitoring run
-            failures += 1
-            if not quiet:
-                print(f"  poll {i + 1}/{polls} failed ({e.__class__.__name__}) — continuing")
-            if failures >= max(3, polls // 2):
-                raise RuntimeError(
-                    f"Live feed unreachable after {failures} failures. "
-                    f"Check your internet connection, or whether {RECENT_URL} is up."
-                ) from e
-
-        if not quiet and (i + 1) % 10 == 0:
-            print(f"  polled {i + 1}/{polls} — {len(seen)} unique transactions so far")
-
-        if i < polls - 1:
-            time.sleep(delay)
-
-    if not seen:
-        raise RuntimeError("Live feed returned no transactions at all.")
-
-    return pd.DataFrame(list(seen.values()))
-
-
-def engineer_features(raw: pd.DataFrame) -> pd.DataFrame:
-    """
-    Turns the raw {txid, fee, vsize, value} rows into the modelling features.
-
-    Values are floored at 1 before any division or log — a transaction can
-    legitimately report a zero value, and one divide-by-zero shouldn't poison
-    an entire monitoring batch.
-    """
-    df = raw.copy()
-
-    value = np.maximum(df["value"].astype(float), 1.0)
-    fee = np.maximum(df["fee"].astype(float), 1.0)
-    vsize = np.maximum(df["vsize"].astype(float), 1.0)
-
-    df["log_value"] = np.log10(value)
-    df["log_fee"] = np.log10(fee)
-    df["vsize"] = vsize
-    df["fee_rate"] = fee / vsize
-    df["fee_ratio_bps"] = (fee / value) * 10_000
-
-    # A handful of transactions carry absurd fee ratios (dust, consolidation
-    # sweeps). Clipping keeps one outlier from dominating the feature scale
-    # without discarding the row — it's still flagged, just not allowed to
-    # rewrite what "normal" looks like for everything else.
-    df["fee_ratio_bps"] = df["fee_ratio_bps"].clip(upper=100_000)
-
-    return df[["txid", "value", "fee", *FEATURES]]
-
-
-def snapshot(polls: int, quiet: bool = False) -> pd.DataFrame:
-    """Fetch a live batch and return it feature-engineered, ready to score."""
     if not quiet:
-        print(f"📡 Pulling a live batch from {RECENT_URL} ({polls} polls)…")
-    raw = fetch_live_transactions(polls, quiet=quiet)
-    df = engineer_features(raw)
+        print(f"📡 Fetching ECB rates {start} → {end} ({len(BASKET)} currencies)…")
+
+    try:
+        payload = _get(
+            f"/{start.isoformat()}..{end.isoformat()}",
+            {"base": BASE, "symbols": ",".join(BASKET)},
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not reach the FX feed at {API_ROOT}. "
+            f"Check your internet connection or whether the host is blocked "
+            f"on this network. Underlying error: {e}"
+        ) from e
+
+    rates = payload.get("rates", {})
+    if not rates:
+        raise RuntimeError(f"FX feed returned no rates for {start}..{end}.")
+
+    # Response is {date: {ccy: rate}} where rate = foreign per 1 INR.
+    # Inverted here to INR per foreign unit.
+    df = pd.DataFrame(rates).T.sort_index()
+    df.index = pd.to_datetime(df.index)
+    df = df.apply(pd.to_numeric, errors="coerce")
+    df = 1.0 / df
+
+    # A currency occasionally goes missing for a single day. Carrying the last
+    # observation forward is the honest fix — it says "no new information",
+    # which is true. Any leading gap is dropped rather than back-filled.
+    df = df.ffill().dropna()
+
     if not quiet:
-        print(f"✅ {len(df)} unique live transactions captured.")
+        print(f"✅ {len(df)} business days of real market data.")
     return df
 
 
+def engineer_features(rates: pd.DataFrame) -> pd.DataFrame:
+    """
+    Collapses the per-currency rate panel into one row per day describing how
+    the basket as a whole behaved. The first row is dropped — you can't
+    compute a change without a previous day to change from.
+    """
+    pct = rates.pct_change().mul(100).dropna(how="all")
+
+    out = pd.DataFrame(index=pct.index)
+    out["max_abs_move"] = pct.abs().max(axis=1)
+    out["mean_abs_move"] = pct.abs().mean(axis=1)
+    out["dispersion"] = pct.std(axis=1)
+    out["usd_move"] = pct["USD"] if "USD" in pct.columns else 0.0
+    out["n_material_moves"] = (pct.abs() >= MATERIAL_MOVE_PCT).sum(axis=1).astype(float)
+    out["basket_drift"] = pct.mean(axis=1)
+
+    out = out.replace([np.inf, -np.inf], np.nan).dropna()
+    out.insert(0, "observed_on", out.index.strftime("%Y-%m-%d"))
+    return out.reset_index(drop=True)
+
+
+def snapshot(start: date, end: date, quiet: bool = False) -> pd.DataFrame:
+    """Fetch a window of real market data, feature-engineered and ready to score."""
+    return engineer_features(fetch_rates(start, end, quiet=quiet))
+
+
+# Window definitions, relative to whenever this is run. The baseline is
+# deliberately cut off well before the present so the monitored window is
+# genuinely unseen data rather than a slice of what the model trained on.
+BASELINE_YEARS = 3
+BASELINE_GAP_DAYS = 120   # baseline ends here-many days before today
+CURRENT_WINDOW_DAYS = 120  # the recent window the monitor scores
+
+
+def baseline_window(today: date | None = None) -> tuple[date, date]:
+    today = today or date.today()
+    return (
+        today - timedelta(days=365 * BASELINE_YEARS),
+        today - timedelta(days=BASELINE_GAP_DAYS),
+    )
+
+
+def current_window(today: date | None = None) -> tuple[date, date]:
+    today = today or date.today()
+    return (today - timedelta(days=CURRENT_WINDOW_DAYS), today)
+
+
 if __name__ == "__main__":
-    # Builds the reference snapshot the anomaly model trains on. Roughly
-    # 90 seconds of live traffic, which is enough to characterise "normal".
-    df = snapshot(polls=60)
+    start, end = baseline_window()
+    df = snapshot(start, end)
     df.to_csv("live_baseline.csv", index=False)
 
-    print("\n📊 What normal looks like right now:")
-    print(df[FEATURES].describe().round(2).to_string())
-    print("\n✅ Saved to live_baseline.csv")
+    print(f"\n📊 What a normal FX day has looked like ({start} → {end}):")
+    print(df[FEATURES].describe().round(3).to_string())
+    print(f"\n✅ {len(df)} business days saved to live_baseline.csv")
+    print("   Next: python -m app.ml.train_live_model")

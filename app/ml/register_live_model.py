@@ -1,14 +1,14 @@
 """
-Registers payment-anomaly-monitor in the governance registry.
+Registers fx-exposure-monitor in the governance registry.
 
 This is the only model in the portfolio whose data source is *live* rather
-than a file. Its lineage says so explicitly, with the actual endpoint recorded
-— so anyone auditing the registry can go and look at the same feed themselves,
-which is the entire point of recording lineage in the first place.
+than a stored file. Its lineage records the actual endpoint, so anyone
+auditing the registry can go and pull the same numbers themselves — which is
+the entire point of recording lineage rather than describing it in a wiki.
 
 Run this AFTER:
     python -m app.ml.live_feed        (builds live_baseline.csv)
-    python -m app.ml.train_live_model (trains payment_anomaly_model.pkl)
+    python -m app.ml.train_live_model (trains fx_anomaly_model.pkl)
 """
 
 from fastapi.testclient import TestClient
@@ -16,12 +16,12 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import SessionLocal
 from app.models.registry import DataLineage
-from app.ml.live_feed import FEATURES, RECENT_URL
+from app.ml.live_feed import API_ROOT, BASE, BASKET, FEATURES
 from app.ml.train_live_model import train
 
 client = TestClient(app)
 
-MODEL_NAME = "payment-anomaly-monitor"
+MODEL_NAME = "fx-exposure-monitor"
 
 
 def register_and_log():
@@ -30,19 +30,22 @@ def register_and_log():
         "version": "v1.0.0",
         "model_type": "traditional_ml",
         "use_case": (
-            "Real-time payment anomaly detection on a live settlement feed — "
-            "stand-in for cross-border payment fraud monitoring"
+            "Daily FX exposure anomaly detection across the bank's currency "
+            "basket — flags abnormal trading days for treasury review"
         ),
-        "owner": "fraud-ops-team",
-        # High tier: a flag here holds someone's payment. Getting it wrong in
-        # either direction is expensive — a missed alert costs money, a false
-        # one blocks a legitimate customer mid-transaction.
-        "risk_tier": "high",
+        "owner": "treasury-risk-team",
+        # Medium tier: this moves the bank's own book and desk attention, not
+        # a customer's access to their money. Tiering it 'high' alongside the
+        # credit models would be inflating it, and the whole point of tiering
+        # is that it means something.
+        "risk_tier": "medium",
         "extra_metadata": {
             "framework": "sklearn.IsolationForest",
             "supervision": "unsupervised",
             "data_source": "live_public_api",
-            "endpoint": RECENT_URL,
+            "provider": "ECB reference rates via frankfurter.dev",
+            "base_currency": BASE,
+            "basket": BASKET,
         },
     })
 
@@ -58,22 +61,22 @@ def register_and_log():
     model_id = model["id"]
     print(f"✅ Registered {MODEL_NAME} (id={model_id})")
 
-    # Lineage goes in via the DB session directly — there's no create endpoint
-    # for it, deliberately: lineage is set once at registration and shouldn't
-    # be casually editable through the API afterwards.
+    # Lineage goes in through the DB session directly — there is no create
+    # endpoint for it, deliberately. Lineage is set once at registration and
+    # shouldn't be casually editable through the API afterwards.
     db = SessionLocal()
     if not db.query(DataLineage).filter(DataLineage.model_id == model_id).first():
         db.add(DataLineage(
             model_id=model_id,
-            source_table=f"live: {RECENT_URL}",
+            source_table=f"live: {API_ROOT} (ECB reference rates)",
             features_used=list(FEATURES),
             notes=(
-                "LIVE public API — data is fetched at monitoring time, not read "
-                "from a stored file, so every run sees traffic that did not exist "
-                "on the previous run. Real cross-border payment traffic (SWIFT, "
-                "RTGS) is private and has no public feed; a public settlement "
-                "ledger is used as an observable stand-in so the monitoring loop "
-                "runs against genuinely arriving data rather than a replayed CSV."
+                "LIVE public API — rates are fetched at monitoring time, not read "
+                "from a stored file, so each run sees business days that did not "
+                "exist on the previous run. Unlike the credit models in this "
+                f"portfolio, no simulation is involved: these are the same {BASE}-based "
+                "ECB reference rates a treasury desk works from. Basket: "
+                + ", ".join(BASKET) + "."
             ),
         ))
         db.commit()
@@ -88,10 +91,10 @@ def register_and_log():
         )
         print(f"  logged {name} = {value:.4f}")
 
-    print(f"\n✅ {MODEL_NAME} registered with its live baseline.")
-    print("   It starts in PILOT with no governance scores — so it cannot")
-    print("   reach production until someone actually evaluates it. That's")
-    print("   the gate working, not an oversight.")
+    print(f"\n✅ {MODEL_NAME} registered with its real-market baseline.")
+    print("   It starts in PILOT with no governance scores — so it cannot reach")
+    print("   production until someone actually evaluates it. That's the gate")
+    print("   working, not an oversight.")
     print("\n   Next: python -m app.ml.live_monitor")
 
 
