@@ -349,6 +349,14 @@ built yet.
   not high, even though it would have been easy to inflate. It moves the bank's
   own book and desk attention, not a customer's access to their money. If
   everything is high-risk, the tier carries no information.
+- **The model found a real crisis, unsupervised.** The top-flagged day in
+  three years of ECB data was **5 August 2024** — worst mover 5.22%, all ten
+  currencies breaching the materiality threshold. That's the yen carry-trade
+  unwind, the day the Nikkei fell 12% and the VIX spiked above 60. Nobody told
+  the model what a market shock looks like or when one happened; it learned the
+  shape of an ordinary day and that one didn't fit. When an interviewer asks
+  whether the model works, this is the answer — not a metric, a date they'll
+  recognise.
 - **A real finding from the data.** The intraday model's flagged minutes
   clustered into a single hour — 12:27 to 13:27 UTC, the London/Europe
   overlap — without anyone telling it when the sessions are. Two adjacent
