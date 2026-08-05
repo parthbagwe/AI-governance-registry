@@ -56,7 +56,16 @@ def train():
     flags = model.predict(X) == -1
 
     metrics = {
-        "anomaly_rate": float(flags.mean()),
+        # Named "baseline_flag_rate", not "anomaly_rate", because on the
+        # training set this number is *defined* by CONTAMINATION — it can only
+        # ever hand back the hyperparameter it was given. It's recorded for
+        # completeness, not as a finding.
+        #
+        # The measurement that means something is the anomaly rate the monitor
+        # observes on data the model has never seen. Keeping the two names
+        # distinct also stops them being plotted as one series in the
+        # dashboard, which would mix a setting with a result.
+        "baseline_flag_rate": float(flags.mean()),
         "mean_anomaly_score": float(np.mean(scores)),
         "p99_anomaly_score": float(np.percentile(scores, 99)),
         "baseline_sample_size": float(len(df)),

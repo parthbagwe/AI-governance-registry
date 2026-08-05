@@ -355,6 +355,13 @@ built yet.
   minutes went +30.6 bps and then −29.4 bps: a spike and full reversal inside
   two minutes, which is a liquidity event, someone hitting a thin book. The
   model found it unsupervised.
+- **A metric that wasn't measuring anything.** Training the anomaly models
+  logged `anomaly_rate`, and it came back as 1.03% every time, on different
+  data. It had to: Isolation Forest's `contamination` parameter *defines* the
+  flag rate on the training set, so that metric could only ever hand back the
+  setting it was given. It's now `baseline_flag_rate`, kept distinct from the
+  anomaly rate the monitor observes on unseen data — which is free to move, and
+  therefore actually tells you something.
 - **Reading the drift output critically.** The first monitoring run reported
   50% drift on a window that was almost entirely *inside* the baseline. That
   isn't a bug — it's intraday seasonality, and chasing it led to the
