@@ -45,6 +45,7 @@ stating plainly rather than glossing over.
 
 | Model | Data | Why |
 |---|---|---|
+| `fx-intraday-monitor` | **Live and real** — 1-minute USD/INR bars from Twelve Data, fetched at monitoring time | Genuine market microstructure. Every run sees minutes that did not exist on the previous run, and reports how many |
 | `fx-exposure-monitor` | **Live and real** — ECB daily reference rates, fetched at monitoring time | The rare case where the genuinely useful data is public. These are the same rates a treasury desk works from. No simulation anywhere in this model |
 | `personal-loan-credit-scorer` | **Real, static** — Kaggle "Give Me Some Credit" (2011 competition), ~150k anonymised borrowers | A real, well-known public credit benchmark. Real signal, real default labels |
 | `sme-credit-scorer` | **Synthetic**, with deliberately engineered correlations | GST filing records are not public anywhere. Simulating them is the only responsible option — not a shortcut |
@@ -107,8 +108,8 @@ money or the bank's compliance position:
 | Risk tier | Minimum score | Example |
 |---|---|---|
 | Low | 5.0 | Internal FAQ bot |
-| Medium | 7.0 | FX exposure monitoring, lead-scoring |
-| High | 8.5 | Credit decisions, fraud blocking |
+| Medium | 7.0 | Daily FX exposure monitoring, lead-scoring |
+| High | 8.5 | Credit decisions, fraud blocking, intraday FX |
 
 The governance score is the average of five 0-10 dimensions. A model with any
 dimension unscored, or an average below its tier's bar, is **mechanically
@@ -175,7 +176,15 @@ python -m app.ml.live_feed              # 3 years of real ECB rates
 python -m app.ml.train_live_model       # Isolation Forest on real market data
 python -m app.ml.register_live_model
 python -m app.ml.live_monitor           # re-run any business day for fresh data
+
+python -m app.ml.intraday_feed          # 1000 real 1-minute USD/INR bars
+python -m app.ml.train_intraday_model
+python -m app.ml.register_intraday_model
+python -m app.ml.intraday_monitor       # re-run any time — watch it climb
 ```
+
+The intraday model needs a free Twelve Data API key. Copy `.env.example` to
+`.env` and paste it in; `.env` is gitignored.
 
 The Streamlit dashboard still works if you prefer it:
 `streamlit run app/dashboard/app.py`
@@ -207,12 +216,82 @@ Because the market genuinely moves between runs, the metric chart fills with
 real measurements over time rather than seeded values — and a demotion, when it
 happens, was caused by something that actually occurred in the market.
 
-**What the FX model watches.** One row per business day, not per currency —
-because a treasury analyst doesn't ask "did EUR move?", they ask "was today a
-normal day?" The six features describe how the whole INR exposure basket
-behaved: how far the worst mover went, whether currencies moved together or
-scattered, how many crossed a 0.5% materiality threshold, and the net
-direction of the basket.
+**What the daily FX model watches.** One row per business day, not per
+currency — because a treasury analyst doesn't ask "did EUR move?", they ask
+"was today a normal day?" The six features describe how the whole INR exposure
+basket behaved: how far the worst mover went, whether currencies moved
+together or scattered, how many crossed a 0.5% materiality threshold, and the
+net direction of the basket.
+
+---
+
+## Two models, one market, different governance
+
+`fx-exposure-monitor` and `fx-intraday-monitor` watch the same currency,
+are owned by the same team, and use the same algorithm. One is tiered
+**medium**, the other **high**.
+
+The difference isn't technical. The daily model's output lands on an analyst's
+desk the next morning — a person stands between the model and any action. The
+1-minute model is fast enough to feed automated hedging, so its output can move
+money with nobody in the loop. **Removing the human is what raises the tier.**
+
+The consequence is mechanical and visible in the registry: the intraday model
+needs 8.5 to reach production where its daily sibling needs 7.0. The faster
+model faces the stricter bar, which is the right way round.
+
+This is the clearest illustration in the project of what risk tiering is
+actually for. It isn't a label describing how clever the model is — it's a
+statement about the blast radius of being wrong, and how much human judgement
+sits between the output and the consequence.
+
+The same logic sets the alert budgets. Contamination is 2% on the daily model
+and 1% on the intraday one. At daily cadence 2% is roughly five alerts a year;
+at 1-minute cadence it would be about fourteen an hour. Nobody reads fourteen
+alerts an hour — they mute the channel, and then the one that mattered goes
+unseen. That number is an operational decision, not a hyperparameter.
+
+### Proving the data is live
+
+`intraday_monitor` reports, every run, how many of the bars it just fetched did
+not exist when the baseline was captured:
+
+```
+🔴 7 of 200 bars are new since the baseline was captured.
+   Most recent bar: 2026-08-06 03:08:00 UTC at 95.08653
+```
+
+Run it again five minutes later and that number climbs. Against a replayed CSV
+it would be zero, forever. It's logged to the registry as
+`new_bars_since_baseline`, so liveness accumulates on the dashboard chart
+rather than being something you have to assert.
+
+The blunter demo: turn off your wifi and run it. It fails with a connection
+error. A file-reading script wouldn't notice.
+
+### A limitation worth naming
+
+FX has strong intraday seasonality. USD/INR at 02:00 UTC is a different market
+from USD/INR at 12:30 — thinner book, smaller moves. The first version of this
+model didn't know that, so it called every quiet overnight minute normal and
+every busy London minute an anomaly.
+
+The fix was cyclical time-of-day features (sine/cosine of the hour, so 23:59
+and 00:01 come out adjacent rather than 23 apart). The model now asks the right
+question: *was this minute unusual for this time of day?*
+
+Those features are deliberately excluded from the drift comparison. A monitored
+window spans a few hours and the baseline spans a full day, so the clock
+differs between them by construction, on every run. Including it would mean
+permanently reporting drift for the sole reason that time passed — and a
+detector that fires unconditionally tells you nothing.
+
+**Still outstanding:** drift is measured against the whole baseline rather than
+against matching hours of the day, so a window drawn entirely from the quiet
+Asian session will report some drift that is really session composition. The
+monitor prints a warning when the window is short enough for this to bite.
+Restricting the baseline to comparable hours is the honest fix, and it isn't
+built yet.
 
 ---
 
@@ -231,11 +310,15 @@ direction of the basket.
    justification.
 5. **No black boxes.** Scroll to "Explain a decision", raise the GST filing
    delay, re-run — the ranked factors reorder.
-6. **Live data.** Open `fx-exposure-monitor` — the lineage panel shows a
+6. **Live data.** Open `fx-intraday-monitor` — the lineage panel shows a
    pulsing live-feed badge with the actual endpoint. Run
-   `python -m app.ml.live_monitor` and refresh: new measurements appear,
-   computed from rates published this week.
-7. **Emergency stop.** Behind a disclosure, requires a documented reason, lands
+   `python -m app.ml.intraday_monitor`, wait five minutes, run it again:
+   the new-bar count climbs, and the chart grows.
+7. **Same market, different governance.** Put `fx-exposure-monitor` and
+   `fx-intraday-monitor` side by side. Same currency, same team, same
+   algorithm — but one needs 7.0 to go live and the other needs 8.5, because
+   only one of them has a human between its output and the money.
+8. **Emergency stop.** Behind a disclosure, requires a documented reason, lands
    in the audit trail flagged red.
 
 ---
@@ -262,10 +345,22 @@ direction of the basket.
   escalated" — that label only exists in hindsight. Its contamination rate is
   an alert-volume decision, not a tuning knob: set it too high and analysts
   drown in noise, and the real alerts get ignored.
-- **Tiering has to mean something.** The FX monitor is tiered *medium*, not
-  high, even though it would have been easy to inflate. It moves the bank's own
-  book and desk attention, not a customer's access to their money. If
+- **Tiering has to mean something.** The daily FX monitor is tiered *medium*,
+  not high, even though it would have been easy to inflate. It moves the bank's
+  own book and desk attention, not a customer's access to their money. If
   everything is high-risk, the tier carries no information.
+- **A real finding from the data.** The intraday model's flagged minutes
+  clustered into a single hour — 12:27 to 13:27 UTC, the London/Europe
+  overlap — without anyone telling it when the sessions are. Two adjacent
+  minutes went +30.6 bps and then −29.4 bps: a spike and full reversal inside
+  two minutes, which is a liquidity event, someone hitting a thin book. The
+  model found it unsupervised.
+- **Reading the drift output critically.** The first monitoring run reported
+  50% drift on a window that was almost entirely *inside* the baseline. That
+  isn't a bug — it's intraday seasonality, and chasing it led to the
+  time-of-day features and the drift/model feature split described above.
+  Noticing that a green-looking number was measuring the wrong thing mattered
+  more than the fix.
 
 ---
 
@@ -278,3 +373,5 @@ direction of the basket.
 - Authenticated identity — `approved_by` is free text, not a verified user
 - Role-based segregation of duties (three lines of defence) — designed, not
   yet enforced end to end
+- Session-matched drift comparison for the intraday model (see "A limitation
+  worth naming" above)

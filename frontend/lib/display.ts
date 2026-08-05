@@ -106,8 +106,35 @@ export function formatDay(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/**
+ * Feature names that don't survive naive de-underscoring. `hour_sin` becoming
+ * "Hour sin" is technically a translation and practically still jargon, so the
+ * handful of cases where the mechanical version reads badly get a real name.
+ */
+const FEATURE_NAMES: Record<string, string> = {
+  hour_sin: "Time of day (sine)",
+  hour_cos: "Time of day (cosine)",
+  return_bps: "Price move (bps)",
+  abs_return_bps: "Move size (bps)",
+  range_bps: "High-to-low range (bps)",
+  gap_bps: "Gap since previous bar (bps)",
+  body_ratio: "Directional share of move",
+  range_vs_recent: "Range vs recent 30 min",
+  max_abs_move: "Largest currency move",
+  mean_abs_move: "Average basket move",
+  dispersion: "Spread across the basket",
+  usd_move: "USD/INR move",
+  n_material_moves: "Currencies moving >0.5%",
+  basket_drift: "Net basket direction",
+  itc_claim_ratio: "Input tax credit ratio",
+  bounce_count_90d: "Bounced payments (90d)",
+  filing_delay_days: "GST filing delay (days)",
+  inflow_volatility: "Income volatility",
+};
+
 /** Turns `avg_monthly_turnover` into `Avg monthly turnover`. */
 export function humaniseField(key: string): string {
+  if (FEATURE_NAMES[key]) return FEATURE_NAMES[key];
   const s = key.replace(/_/g, " ").trim();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

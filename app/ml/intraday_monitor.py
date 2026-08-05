@@ -30,7 +30,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import SessionLocal
 from app.models.registry import MLModel
-from app.ml.intraday_feed import BASELINE_PATH, FEATURES, snapshot
+from app.ml.intraday_feed import BASELINE_PATH, DRIFT_FEATURES, FEATURES, snapshot
 from app.ml.train_intraday_model import MODEL_PATH
 
 client = TestClient(app)
@@ -46,15 +46,22 @@ BARS_PER_RUN = 200
 
 def _measure_drift(reference: pd.DataFrame, current: pd.DataFrame) -> tuple[float, int]:
     """
-    Returns (share_of_features_drifted, count). Same result-shape matching as
-    the other monitors: this Evidently version leaves metric_id unpopulated, so
-    the summary metric is found by being the one whose value is a
-    {count, share} dict.
+    Returns (share_of_features_drifted, count).
+
+    Measured on DRIFT_FEATURES, not FEATURES — the clock is excluded on
+    purpose. A monitored window covers a few hours and the baseline covers a
+    full day, so the time-of-day features differ between them by construction,
+    on every run, forever. Letting them count would mean permanently reporting
+    drift because time passed.
+
+    Same result-shape matching as the other monitors: this Evidently version
+    leaves metric_id unpopulated, so the summary metric is found by being the
+    one whose value is a {count, share} dict.
     """
     report = Report([DataDriftPreset()])
     result = report.run(
-        reference_data=reference[FEATURES],
-        current_data=current[FEATURES],
+        reference_data=reference[DRIFT_FEATURES],
+        current_data=current[DRIFT_FEATURES],
     )
     summary = next(
         m for m in result.dict()["metrics"]
@@ -138,8 +145,19 @@ def run():
         f"/api/v1/models/{model_id}/metrics",
         json={"metric_name": "drift_share", "metric_value": drift_share},
     )
-    print(f"\n📉 Drift vs baseline: {drifted_count}/{len(FEATURES)} features shifted "
-          f"({drift_share:.0%}, threshold {DRIFT_SHARE_THRESHOLD:.0%})")
+    print(f"\n📉 Drift vs baseline: {drifted_count}/{len(DRIFT_FEATURES)} market "
+          f"features shifted ({drift_share:.0%}, threshold {DRIFT_SHARE_THRESHOLD:.0%})")
+
+    # Honest caveat, printed rather than buried: FX has strong intraday
+    # seasonality. A window drawn entirely from the quiet Asian session will
+    # look different from a baseline spanning London and New York too, and
+    # that difference is the clock, not a regime change. The model handles
+    # this — it has the time features — but this comparison doesn't yet.
+    # Restricting the baseline to matching hours is the outstanding fix.
+    if len(current) < 0.4 * len(baseline):
+        print("   ⚠️  This window is much shorter than the baseline, so some of")
+        print("       the reported drift is session composition rather than a")
+        print("       genuine regime change. Read it with that in mind.")
 
     # 5. Act, through the same gate a person would use.
     if drift_share >= DRIFT_SHARE_THRESHOLD and stage == "production":
@@ -150,9 +168,9 @@ def run():
                 "to_stage": "review",
                 "approved_by": "intraday-monitor-service",
                 "comment": (
-                    f"Auto-demoted from live: {drift_share:.0%} of input features "
-                    f"({drifted_count}/{len(FEATURES)}) have shifted away from the "
-                    f"training baseline, indicating the intraday volatility regime "
+                    f"Auto-demoted from live: {drift_share:.0%} of market features "
+                    f"({drifted_count}/{len(DRIFT_FEATURES)}) have shifted away from "
+                    f"the training baseline, indicating the intraday volatility regime "
                     f"has changed. Observed anomaly rate was "
                     f"{observed['anomaly_rate']:.1%} across {len(current)} bars "
                     f"ending {newest} UTC. Retrain on current market conditions "

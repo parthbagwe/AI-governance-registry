@@ -46,7 +46,8 @@ INTERVAL = "1min"
 # shift through a session; 30 minutes of context keeps the comparison fair.
 RECENT_WINDOW = 30
 
-FEATURES = [
+# How the market behaved during the minute. These describe the *event*.
+MARKET_FEATURES = [
     "return_bps",       # signed move, in basis points
     "abs_return_bps",   # magnitude, independent of direction
     "range_bps",        # high-to-low travel within the minute
@@ -55,6 +56,29 @@ FEATURES = [
     "range_vs_recent",  # this bar's range against the last 30 minutes
 ]
 
+# When the minute happened. Encoded as a sine/cosine pair so the clock is
+# treated as a circle: 23:59 and 00:01 come out adjacent, which they are.
+# A single "hour" integer would put them 23 apart and teach the model that
+# midnight is the most extreme moment of the day.
+TIME_FEATURES = ["hour_sin", "hour_cos"]
+
+# What the model actually sees. Time is included deliberately: USD/INR at
+# 02:00 UTC is a different market from USD/INR at 12:30 UTC — thinner book,
+# smaller moves — and without the clock the model calls every quiet overnight
+# minute normal and every busy London minute an anomaly. With it, the question
+# becomes the right one: "was this minute unusual *for this time of day*?"
+FEATURES = MARKET_FEATURES + TIME_FEATURES
+
+# What drift is measured on. Deliberately NOT the same list.
+#
+# Any monitored window is a few hours; the baseline spans a full day. So the
+# clock features are guaranteed to differ between them, every single run,
+# forever. Including them in drift would mean permanently reporting drift for
+# the sole reason that time passed — a detector that fires unconditionally
+# tells you nothing. Drift should answer "has the market changed?", not "is it
+# a different hour than it was?"
+DRIFT_FEATURES = MARKET_FEATURES
+
 FEATURE_LABELS = {
     "return_bps": "Price move over the minute (bps)",
     "abs_return_bps": "Size of the move, ignoring direction (bps)",
@@ -62,6 +86,8 @@ FEATURE_LABELS = {
     "gap_bps": "Jump since the previous minute's close (bps)",
     "body_ratio": "Directional share of the move (0 = pure wick, 1 = clean trend)",
     "range_vs_recent": "This minute's range vs the last 30 minutes",
+    "hour_sin": "Time of day (cyclical encoding, sine component)",
+    "hour_cos": "Time of day (cyclical encoding, cosine component)",
 }
 
 
@@ -181,6 +207,13 @@ def engineer_features(bars: pd.DataFrame) -> pd.DataFrame:
     recent = df["range_bps"].rolling(RECENT_WINDOW, min_periods=RECENT_WINDOW).median()
     df["range_vs_recent"] = df["range_bps"] / recent.replace(0, np.nan)
 
+    # Time of day as a point on a circle. Minutes are included in the fraction
+    # so 12:00 and 12:59 aren't collapsed into the same instant.
+    minute_of_day = df["datetime"].dt.hour + df["datetime"].dt.minute / 60.0
+    angle = 2.0 * np.pi * minute_of_day / 24.0
+    df["hour_sin"] = np.sin(angle)
+    df["hour_cos"] = np.cos(angle)
+
     df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=FEATURES)
 
     out = df[["datetime", "close", *FEATURES]].copy()
@@ -201,7 +234,7 @@ if __name__ == "__main__":
     df.to_csv(BASELINE_PATH, index=False)
 
     print(f"\n📊 What a normal minute has looked like ({len(df)} bars):")
-    print(df[FEATURES].describe().round(3).to_string())
+    print(df[MARKET_FEATURES].describe().round(3).to_string())
     print(f"\n   Latest price: {df['close'].iloc[-1]:.5f} at {df['observed_at'].iloc[-1]} UTC")
     print(f"\n✅ Saved to {BASELINE_PATH}")
     print("   Next: python -m app.ml.train_intraday_model")
