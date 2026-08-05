@@ -122,4 +122,9 @@ export const METRIC_GLOSS: Record<string, string> = {
   latency_ms: "How long a single decision takes, in milliseconds",
   drift_share: "Share of inputs that have shifted away from training data",
   fairness_ratio: "Approval-rate parity between customer segments (1.0 = equal)",
+  anomaly_rate: "Share of live transactions flagged as unusual",
+  mean_anomaly_score: "Average unusualness across the batch",
+  p99_anomaly_score: "How extreme the most unusual 1% were",
+  live_batch_size: "Transactions pulled from the live feed this run",
+  baseline_sample_size: "Transactions the model learned 'normal' from",
 };

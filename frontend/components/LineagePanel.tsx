@@ -1,4 +1,4 @@
-import { Database } from "lucide-react";
+import { Database, Radio } from "lucide-react";
 
 import type { DataLineage } from "@/lib/types";
 import { humaniseField } from "@/lib/display";
@@ -22,16 +22,39 @@ export function LineagePanel({ lineage }: { lineage: DataLineage[] }) {
         {lineage.length === 0 ? (
           <Empty>No lineage recorded for this model.</Empty>
         ) : (
-          lineage.map((l, i) => (
+          lineage.map((l, i) => {
+            // Sources registered as "live: <url>" are fetched at monitoring
+            // time rather than read from a stored file — worth marking, since
+            // "is this data still arriving?" is the first question anyone
+            // reviewing a monitoring model asks.
+            const isLive = l.source_table.startsWith("live:");
+            return (
             <div
               key={i}
-              className="rounded-lg border border-white/[0.06] bg-ink-900/40 p-4"
+              className={`rounded-lg border p-4 ${
+                isLive
+                  ? "border-emerald-400/20 bg-emerald-400/[0.04]"
+                  : "border-white/[0.06] bg-ink-900/40"
+              }`}
             >
-              <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-sky-400" />
-                <span className="font-mono text-sm text-slate-200">
-                  {l.source_table}
+              <div className="flex flex-wrap items-center gap-2">
+                {isLive ? (
+                  <Radio className="h-4 w-4 shrink-0 text-emerald-400" />
+                ) : (
+                  <Database className="h-4 w-4 shrink-0 text-sky-400" />
+                )}
+                <span className="break-all font-mono text-sm text-slate-200">
+                  {isLive ? l.source_table.slice(5).trim() : l.source_table}
                 </span>
+                {isLive && (
+                  <span className="chip bg-emerald-400/10 text-emerald-300 ring-emerald-400/25">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    </span>
+                    Live feed
+                  </span>
+                )}
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -52,7 +75,8 @@ export function LineagePanel({ lineage }: { lineage: DataLineage[] }) {
                 </p>
               )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </section>
