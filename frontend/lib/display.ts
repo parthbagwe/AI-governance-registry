@@ -125,6 +125,10 @@ export const METRIC_GLOSS: Record<string, string> = {
   anomaly_rate: "Share of live transactions flagged as unusual",
   mean_anomaly_score: "Average unusualness across the batch",
   p99_anomaly_score: "How extreme the most unusual 1% were",
-  live_batch_size: "Transactions pulled from the live feed this run",
-  baseline_sample_size: "Transactions the model learned 'normal' from",
+  live_window_days: "Trading days pulled from the live feed this run",
+  live_window_bars: "One-minute bars pulled from the live feed this run",
+  baseline_sample_size: "Observations the model learned 'normal' from",
+  baseline_mean_range_bps: "Typical high-to-low travel per minute (bps)",
+  new_bars_since_baseline: "Bars that did not exist when the model was trained",
+  latest_price: "Most recent observed price",
 };
