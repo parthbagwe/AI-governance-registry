@@ -16,6 +16,9 @@ pydantic>=2.9
 sqlalchemy>=2.0
 psycopg2-binary>=2.9
 
+# Required by FastAPI to accept file uploads (the dataset diagnostics endpoint)
+python-multipart>=0.0.9
+
 # Needed by the /explain endpoint at request time
 pandas>=2.2
 numpy>=1.26

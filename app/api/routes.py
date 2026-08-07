@@ -1,6 +1,8 @@
+import io
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+import pandas as pd
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -31,6 +33,86 @@ def _to_response(model: MLModel) -> ModelResponse:
     resp = ModelResponse.model_validate(model)
     resp.governance_score = model.governance_score
     return resp
+
+
+@router.post("/assessment")
+def run_assessment(proposal: dict):
+    """
+    Assesses a proposed model against the RBI draft Guidance before it's built.
+
+    A rules engine, not a predictor. Every finding names the principle and
+    paragraph it comes from, so the reasoning can be checked and argued with —
+    see app/api/assessment.py for why a learned failure-probability would be
+    the wrong thing to build here.
+
+    Takes no database session: nothing is stored. Assessing a hypothetical
+    model shouldn't put it in the inventory, and someone exploring options
+    shouldn't leave a trail of half-formed proposals behind.
+    """
+    from app.api.assessment import (
+        ModelProposal, RBI_SOURCE, assess_governance, assess_tier, summarise,
+    )
+
+    known = ModelProposal.__dataclass_fields__.keys()
+    cleaned = {k: v for k, v in proposal.items() if k in known}
+    if not cleaned.get("name") or not cleaned.get("use_case"):
+        raise HTTPException(
+            status_code=422,
+            detail="A model name and a description of its use case are both required.",
+        )
+
+    p = ModelProposal(**cleaned)
+    tiering = assess_tier(p)
+    findings = assess_governance(p, tiering["tier"])
+
+    return {
+        "source": RBI_SOURCE,
+        "tiering": tiering,
+        "summary": summarise(findings, tiering["tier"]),
+        "findings": [f.as_dict() for f in findings],
+    }
+
+
+@router.post("/assessment/dataset")
+async def assess_dataset(file: UploadFile = File(...)):
+    """
+    Statistical diagnostics on an uploaded CSV.
+
+    Held in memory and discarded when the request ends — the file is never
+    written to disk. A governance tool that quietly accumulated copies of
+    whatever people uploaded to it would be a liability rather than a control.
+    """
+    from app.api.diagnostics import diagnose
+
+    if not file.filename or not file.filename.lower().endswith((".csv", ".tsv", ".txt")):
+        raise HTTPException(
+            status_code=422,
+            detail="Upload a CSV. Excel files aren't parsed here — save as CSV first.",
+        )
+
+    raw = await file.read()
+
+    # 20MB ceiling: enough for a realistic training extract, small enough that
+    # a stray upload can't exhaust the process.
+    if len(raw) > 20 * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail="File is over 20MB. Upload a representative sample instead — "
+                   "the diagnostics are statistical and don't need the whole set.",
+        )
+
+    try:
+        sep = "\t" if file.filename.lower().endswith(".tsv") else ","
+        df = pd.read_csv(io.BytesIO(raw), sep=sep)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not parse that file: {e}")
+
+    if df.empty:
+        raise HTTPException(status_code=422, detail="That file has no rows.")
+
+    result = diagnose(df)
+    result["filename"] = file.filename
+    return result
 
 
 @router.get("/lineage", response_model=List[LineageExportRow])
