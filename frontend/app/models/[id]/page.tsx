@@ -7,13 +7,14 @@ import { ArrowLeft, RefreshCw } from "lucide-react";
 
 import { api, ApiError } from "@/lib/api";
 import { formatDate, RISK_META, STAGE_META, TYPE_LABEL } from "@/lib/display";
-import type {
-  ApprovalEvent,
-  DataLineage,
-  MLModel,
-  ModelMetric,
+import {
+  isLiveSource,
+  type ApprovalEvent,
+  type DataLineage,
+  type MLModel,
+  type ModelMetric,
 } from "@/lib/types";
-import { RiskBadge, StageBadge } from "@/components/Badges";
+import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
 import { ErrorState, Loading } from "@/components/States";
 import { Scorecard } from "@/components/Scorecard";
 import { MetricChart } from "@/components/MetricChart";
@@ -22,6 +23,7 @@ import { LineagePanel } from "@/components/LineagePanel";
 import { ActionPanel } from "@/components/ActionPanel";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { Reveal } from "@/components/Motion";
+import { TextReveal } from "@/components/TextReveal";
 
 export default function ModelDetailPage() {
   const params = useParams<{ id: string }>();
@@ -87,9 +89,12 @@ export default function ModelDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight text-white">
-                {model.name}
-              </h1>
+              <TextReveal
+                as="h1"
+                text={model.name}
+                className="text-[clamp(1.5rem,3.4vw,2.3rem)] font-semibold tracking-[-0.025em] text-white"
+                stagger={26}
+              />
               <span className="font-mono text-sm text-slate-600">
                 {model.version}
               </span>
@@ -101,6 +106,7 @@ export default function ModelDetailPage() {
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <StageBadge stage={model.stage} />
               <RiskBadge tier={model.risk_tier} />
+              {isLiveSource(model) && <LiveBadge />}
               <span className="chip bg-white/[0.04] text-slate-400 ring-white/[0.07]">
                 {TYPE_LABEL[model.model_type]}
               </span>

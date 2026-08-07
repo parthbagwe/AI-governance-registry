@@ -71,6 +71,20 @@ body {
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
+/* Lenis needs these to hand scrolling over cleanly. Without them the browser
+   keeps its own smooth-scroll behaviour and the two fight each other, which
+   shows up as a stutter on anchor jumps. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -148,6 +162,49 @@ body {
   .grow {
     transition: width 1s var(--ease-out-soft);
   }
+
+  /* Cursor-tracking light. The gradient is painted by a pseudo-element that's
+     transparent until hover, so an idle page costs nothing. Position comes
+     from --mx/--my, written directly to the node by Spotlight.tsx — no React
+     state, so moving the mouse never triggers a re-render. */
+  .spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.45s var(--ease-out-soft);
+    background: radial-gradient(
+      380px circle at var(--mx, 50%) var(--my, 50%),
+      rgba(56, 189, 248, 0.07),
+      transparent 65%
+    );
+    pointer-events: none;
+    z-index: -1;
+  }
+  .spotlight:hover::before {
+    opacity: 1;
+  }
+
+  /* A hairline that draws itself across the width of its container. Used to
+     separate the masthead from the content — a static rule reads as a border,
+     one that draws reads as an entrance. */
+  .rule {
+    position: relative;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    transform-origin: left;
+    animation: sweep 1.4s var(--ease-out-soft) both;
+  }
+}
+
+@keyframes sweep {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 /* Anyone who has asked their OS to reduce motion gets none of it. This isn't

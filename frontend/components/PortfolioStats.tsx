@@ -1,6 +1,7 @@
 import { Activity, AlertTriangle, ClipboardCheck, Layers } from "lucide-react";
 import type { MLModel } from "@/lib/types";
 import { CountUp } from "@/components/Motion";
+import { Spotlight } from "@/components/Spotlight";
 
 /**
  * The four numbers a risk committee actually opens this page to see, before
@@ -47,11 +48,11 @@ export function PortfolioStats({ models }: { models: MLModel[] }) {
   return (
     <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => (
-        <div key={c.label} className="panel lift p-4">
+        <Spotlight key={c.label} className="panel lift rounded-xl p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="label">{c.label}</p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums text-white">
+              <p className="mt-2 text-[2.4rem] font-semibold leading-none tracking-[-0.03em] tabular-nums text-white">
                 <CountUp value={c.value} />
               </p>
             </div>
@@ -62,7 +63,7 @@ export function PortfolioStats({ models }: { models: MLModel[] }) {
             </span>
           </div>
           <p className="mt-3 text-xs text-slate-500">{c.note}</p>
-        </div>
+        </Spotlight>
       ))}
     </div>
   );

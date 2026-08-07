@@ -1,6 +1,7 @@
 import { MIN_SCORE_BY_TIER, SCORE_DIMENSIONS } from "@/lib/types";
 import type { MLModel } from "@/lib/types";
 import { scoreHealth } from "@/lib/display";
+import { CountUp } from "@/components/Motion";
 
 /**
  * The five-dimension scorecard, shown as bars rather than bare numbers so the
@@ -27,8 +28,14 @@ export function Scorecard({ model }: { model: MLModel }) {
         </div>
 
         <div className="text-right">
-          <p className={`font-mono text-3xl font-semibold tabular-nums ${health.tone}`}>
-            {model.governance_score?.toFixed(2) ?? "—"}
+          <p
+            className={`font-mono text-[2.6rem] font-semibold leading-none tracking-[-0.03em] tabular-nums ${health.tone}`}
+          >
+            {model.governance_score !== null ? (
+              <CountUp value={model.governance_score} decimals={2} />
+            ) : (
+              "—"
+            )}
             <span className="ml-1 text-base text-slate-600">/10</span>
           </p>
           <p className="mt-0.5 text-xs text-slate-500">{health.label}</p>

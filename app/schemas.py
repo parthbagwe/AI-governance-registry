@@ -68,6 +68,12 @@ class ModelResponse(BaseModel):
     cost_reduction_score: Optional[float]
     revenue_impact_score: Optional[float]
     governance_score: Optional[float]
+
+    # Returned on the list endpoint so the UI can distinguish a model fed by a
+    # live feed from one trained on a static file, without an N+1 query into
+    # the lineage table for every row.
+    extra_metadata: Optional[Dict[str, Any]] = None
+
     created_at: datetime
     updated_at: datetime
 

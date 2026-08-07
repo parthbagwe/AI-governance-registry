@@ -23,8 +23,21 @@ export interface MLModel {
   cost_reduction_score: number | null;
   revenue_impact_score: number | null;
   governance_score: number | null;
+  extra_metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Whether this model is fed by a live feed rather than a static file.
+ *
+ * Read from `extra_metadata.data_source`, which the registration scripts set.
+ * Deliberately not inferred from the model's name — a naming convention is a
+ * habit, and habits break silently.
+ */
+export function isLiveSource(model: MLModel): boolean {
+  const source = model.extra_metadata?.data_source;
+  return typeof source === "string" && source.startsWith("live_");
 }
 
 export interface ModelMetric {

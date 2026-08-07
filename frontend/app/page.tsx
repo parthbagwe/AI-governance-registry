@@ -6,9 +6,10 @@ import { ChevronRight, Info, RefreshCw, Search } from "lucide-react";
 
 import { api, ApiError } from "@/lib/api";
 import { scoreHealth, TYPE_LABEL } from "@/lib/display";
-import type { MLModel, ModelStage, RiskTier } from "@/lib/types";
-import { RiskBadge, StageBadge } from "@/components/Badges";
+import { isLiveSource, type MLModel, type ModelStage, type RiskTier } from "@/lib/types";
+import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
 import { PortfolioStats } from "@/components/PortfolioStats";
+import { TextReveal } from "@/components/TextReveal";
 import { Empty, ErrorState, Loading } from "@/components/States";
 
 type StageFilter = ModelStage | "all";
@@ -29,6 +30,11 @@ const RISK_FILTERS: { value: RiskFilter; label: string }[] = [
   { value: "low", label: "Low" },
 ];
 
+const SOURCE_FILTERS: { value: "all" | "live"; label: string }[] = [
+  { value: "all", label: "All sources" },
+  { value: "live", label: "Live feeds" },
+];
+
 export default function RegistryPage() {
   const [models, setModels] = useState<MLModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +43,7 @@ export default function RegistryPage() {
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState<StageFilter>("all");
   const [risk, setRisk] = useState<RiskFilter>("all");
+  const [source, setSource] = useState<"all" | "live">("all");
 
   async function load() {
     setRefreshing(true);
@@ -60,6 +67,7 @@ export default function RegistryPage() {
     return models.filter((m) => {
       if (stage !== "all" && m.stage !== stage) return false;
       if (risk !== "all" && m.risk_tier !== risk) return false;
+      if (source === "live" && !isLiveSource(m)) return false;
       if (!q) return true;
       return (
         m.name.toLowerCase().includes(q) ||
@@ -67,35 +75,54 @@ export default function RegistryPage() {
         m.owner.toLowerCase().includes(q)
       );
     });
-  }, [models, query, stage, risk]);
+  }, [models, query, stage, risk, source]);
 
   if (error) return <ErrorState message={error} />;
   if (!models) return <Loading label="Loading the model registry…" />;
 
   return (
     <div className="space-y-6">
-      <div className="rise flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
-            Model portfolio
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Every AI model the bank runs, what stage it&apos;s at, and whether
-            it has cleared the approval bar for the risk it carries.
-          </p>
-        </div>
-        <button
-          onClick={load}
-          disabled={refreshing}
-          className="btn-ghost"
-          aria-label="Refresh the registry"
+      {/* Masthead. Deliberately larger than a dashboard heading needs to be —
+          it gives the word-by-word reveal something to work with, and it sets
+          the tone before any data loads. */}
+      <section className="pb-2 pt-6 sm:pt-10">
+        <p
+          className="fade-in label mb-5 text-slate-500"
+          style={{ animationDelay: "0.15s" }}
         >
-          <RefreshCw
-            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+          Model risk management
+        </p>
+
+        <TextReveal
+          as="h1"
+          text="Every model the bank runs, and whether it has earned the right to run."
+          className="max-w-4xl text-[clamp(1.9rem,5.2vw,3.4rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-white"
+          delay={120}
+        />
+
+        <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+          <TextReveal
+            text="Approval is a statement about the world at a point in time. This is what watches for the world changing."
+            className="max-w-xl text-sm leading-relaxed text-slate-400"
+            delay={620}
+            stagger={14}
           />
-          Refresh
-        </button>
-      </div>
+          <button
+            onClick={load}
+            disabled={refreshing}
+            className="btn-ghost fade-in"
+            style={{ animationDelay: "1s" }}
+            aria-label="Refresh the registry"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </button>
+        </div>
+
+        <div className="rule mt-8" style={{ animationDelay: "0.5s" }} />
+      </section>
 
       <PortfolioStats models={models} />
 
@@ -147,6 +174,11 @@ export default function RegistryPage() {
           options={RISK_FILTERS}
           value={risk}
           onChange={(v) => setRisk(v as RiskFilter)}
+        />
+        <FilterGroup
+          options={SOURCE_FILTERS}
+          value={source}
+          onChange={(v) => setSource(v as "all" | "live")}
         />
       </div>
 
@@ -221,11 +253,12 @@ function ModelRow({ model }: { model: MLModel }) {
       className="group/row grid grid-cols-1 gap-3 px-5 py-4 transition-colors duration-300 hover:bg-white/[0.035] md:grid-cols-[minmax(0,2.4fr)_auto_auto_auto_auto] md:items-center md:gap-4"
     >
       <div className="min-w-0">
-        <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="truncate font-medium text-white">{model.name}</span>
           <span className="shrink-0 font-mono text-[11px] text-slate-600">
             {model.version}
           </span>
+          {isLiveSource(model) && <LiveBadge className="shrink-0" />}
         </div>
         <p className="mt-0.5 truncate text-sm text-slate-500">
           {model.use_case}
