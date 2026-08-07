@@ -7,7 +7,8 @@ from app.database import get_db
 from app.models.registry import MLModel, ModelMetric, ApprovalEvent, DataLineage
 from app.schemas import (
     ModelCreate, ModelResponse, ScoreUpdate, ApprovalRequest,
-    MetricCreate, MetricResponse, ApprovalEventResponse, LineageResponse,
+    MetricCreate, MetricResponse, ApprovalEventResponse,
+    LineageCreate, LineageResponse,
 )
 from app.workflow import validate_transition, InvalidTransitionError, GovernanceGateError, kill_switch
 
@@ -196,6 +197,40 @@ def get_lineage(model_id: str, db: Session = Depends(get_db)):
     return db.query(DataLineage).filter(DataLineage.model_id == model_id).all()
 
 
+@router.post("/models/{model_id}/lineage", response_model=LineageResponse, status_code=201)
+def add_lineage(model_id: str, payload: LineageCreate, db: Session = Depends(get_db)):
+    """
+    Record a data source for this model version.
+
+    Create-only by design: there is no PUT or DELETE for lineage. What data a
+    model version was built on is a historical fact — if it changed, what you
+    have is a different model version, and the registry should say so. Being
+    able to quietly rewrite a model's stated inputs would undermine the reason
+    for recording them.
+
+    Re-posting the same source_table is treated as idempotent rather than an
+    error, so registration scripts can safely be re-run.
+    """
+    _get_model_or_404(db, model_id)
+
+    existing = (
+        db.query(DataLineage)
+        .filter(
+            DataLineage.model_id == model_id,
+            DataLineage.source_table == payload.source_table,
+        )
+        .first()
+    )
+    if existing:
+        return existing
+
+    lineage = DataLineage(model_id=model_id, **payload.model_dump())
+    db.add(lineage)
+    db.commit()
+    db.refresh(lineage)
+    return lineage
+
+
 @router.post("/models/{model_id}/explain")
 def explain_prediction(model_id: str, applicant: dict, db: Session = Depends(get_db)):
     """
@@ -209,7 +244,20 @@ def explain_prediction(model_id: str, applicant: dict, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="Explainability is only wired up for sme-credit-scorer in this prototype.")
 
     from app.ml.explain import explain_applicant
-    prob, contributions = explain_applicant(applicant)
+
+    try:
+        prob, contributions = explain_applicant(applicant)
+    except FileNotFoundError as e:
+        # 503 rather than 500: the service is fine, the model artifact isn't
+        # available. That's a deployment state, not a bug, and the caller
+        # should be told which.
+        raise HTTPException(status_code=503, detail=str(e))
+    except KeyError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Missing required applicant field: {e}",
+        )
+
     return {
         "predicted_default_probability": round(float(prob), 4),
         "decision": "FLAGGED AS HIGHER RISK" if prob > 0.5 else "LOOKS OKAY",

@@ -86,6 +86,12 @@ class ApprovalEventResponse(BaseModel):
         from_attributes = True
 
 
+class LineageCreate(BaseModel):
+    source_table: str
+    features_used: List[str]
+    notes: Optional[str] = None
+
+
 class LineageResponse(BaseModel):
     source_table: str
     features_used: List[str]

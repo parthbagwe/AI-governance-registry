@@ -81,19 +81,16 @@ def _log_to_registry(approval_rates, flagged_segments):
     same way drift_check.py logs drift_share — so fairness becomes part of
     the model's tracked history, not a one-off script output nobody sees again.
     """
-    from fastapi.testclient import TestClient
-    from app.main import app
-    from app.database import SessionLocal
-    from app.models.registry import MLModel
+    from app.ml.registry_client import describe_target, fetch_model, get_client
 
-    client = TestClient(app)
-    db = SessionLocal()
-    sme = db.query(MLModel).filter(MLModel.name == "sme-credit-scorer").first()
+    client = get_client()
+    print(f"\n📕 Registry: {describe_target()}")
+
+    sme = fetch_model(client, "sme-credit-scorer")
     if not sme:
-        db.close()
+        print("   sme-credit-scorer isn't registered — nothing to log against.")
         return
-    model_id = sme.id
-    db.close()
+    model_id = sme["id"]
 
     worst_ratio = (approval_rates / approval_rates.max()).min()
     client.post(

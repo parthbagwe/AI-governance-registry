@@ -1,0 +1,40 @@
+# Render Blueprint — creates the API and its Postgres in one step.
+#
+# In Render: New -> Blueprint -> point it at this repo. It reads this file,
+# provisions both services, and wires DATABASE_URL across automatically so
+# you never copy a connection string by hand.
+#
+# Note on the free tier: the web service sleeps after ~15 minutes idle, so the
+# first request after a quiet spell takes 30-60 seconds to wake it. Worth
+# knowing before you open the demo in front of someone — load the page a
+# minute before you need it.
+
+databases:
+  - name: governance-db
+    databaseName: governance
+    user: governance
+    plan: free
+
+services:
+  - type: web
+    name: ai-governance-registry-api
+    runtime: python
+    plan: free
+    region: singapore # closest to India; change if you're elsewhere
+    buildCommand: pip install -r requirements.txt
+    # bootstrap.py creates tables and seeds only if the registry is empty,
+    # so a redeploy never wipes data.
+    startCommand: python bootstrap.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: governance-db
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # Set this to your Vercel URL once the frontend is deployed. Leaving it
+      # unset defaults to "*", which is fine for a demo and wrong for anything
+      # else — any page on the internet could POST approvals to your registry.
+      - key: ALLOWED_ORIGINS
+        sync: false

@@ -129,8 +129,12 @@ reachable by the same form a routine reviewer fills in.
 cd D:\ai-governance-registry
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+
+`requirements.txt` holds only what the deployed API needs. `requirements-dev.txt`
+adds training, drift detection, the live feeds and the Streamlit dashboard —
+that's the one to install locally.
 
 Frontend (needs Node.js LTS):
 
@@ -295,6 +299,95 @@ built yet.
 
 ---
 
+## Deployment
+
+The backend goes to Render and the frontend to Vercel, because they need
+different things: FastAPI wants a long-running process, and Next.js compiles to
+static output plus serverless functions. Vercel can't host the first;
+that's why Streamlit was replaced rather than lifted across.
+
+### 1. Backend on Render
+
+The repo includes `render.yaml`, so this is a Blueprint deploy rather than a
+form-filling exercise:
+
+1. Push to GitHub.
+2. Render -> **New** -> **Blueprint** -> select this repo.
+3. It provisions a free Postgres and the web service, and wires `DATABASE_URL`
+   between them automatically.
+4. Wait for the build. The first one takes several minutes — `shap` and
+   `xgboost` are large.
+
+When it's up, check `https://<your-service>.onrender.com/health`. It reports
+which database backend is actually in use:
+
+```json
+{ "status": "ok", "database": "postgresql", "persistent": true }
+```
+
+If that says `sqlite` and `persistent: false`, `DATABASE_URL` didn't reach the
+service. Everything will appear to work and then quietly lose all data on the
+next redeploy — which is precisely why the health check reports it rather than
+just saying "ok".
+
+`bootstrap.py` runs before the server starts. It creates tables and seeds the
+sample portfolio **only if the registry is empty**, so redeploys never wipe
+data.
+
+### 2. Frontend on Vercel
+
+1. Vercel -> **Add New** -> **Project** -> import the repo.
+2. Set **Root Directory** to `frontend`. Everything else is detected.
+3. Add an environment variable:
+   `NEXT_PUBLIC_API_URL = https://<your-service>.onrender.com/api/v1`
+   — the `/api/v1` suffix matters; without it every request 404s.
+4. Deploy.
+
+### 3. Close the CORS hole
+
+Back on Render, set `ALLOWED_ORIGINS` to your Vercel URL and redeploy. It
+defaults to `*` so a fresh clone runs with no configuration, but a governance
+API that any page on the internet can POST approvals to is not a governance
+API.
+
+### 4. Point the monitors at production
+
+The monitors talked to the registry in-process, which assumed the API and the
+monitor were the same program. Set `REGISTRY_API_URL` and they speak to the
+deployed service over HTTP instead:
+
+```powershell
+$env:REGISTRY_API_URL = "https://<your-service>.onrender.com"
+python -m app.ml.intraday_monitor
+```
+
+Every script prints where it's writing before it does anything — *which
+registry did I just update?* should never be something you have to work out
+afterwards.
+
+Nothing else changes. Both paths hit the same endpoints, the same state
+machine, and get the same 403 when a promotion is refused. A monitor running
+against production has no more authority than one running locally, which is
+the same principle the governance gate rests on: no actor gets a private door.
+
+### Things that will catch you out
+
+- **Free Render services sleep** after ~15 minutes idle. The first request
+  after a quiet spell takes 30–60 seconds. Load the page a minute before you
+  demo it.
+- **`sme_credit_model.pkl` is committed**, against the general rule about not
+  committing build outputs. `/explain` loads it at request time and a hosted
+  instance has no way to train one. A real setup would pull it from a model
+  registry or object store; this is a documented shortcut, and the endpoint
+  returns a clear 503 rather than a 500 if the artifact is missing.
+- **The monitors run from your machine, not Render.** Free tier has no cron.
+  For a real deployment they'd be a scheduled job — GitHub Actions on a cron
+  hitting the deployed API would work and stay free.
+- **`NEXT_PUBLIC_` variables are compiled into the browser bundle.** Fine for
+  an API URL, never for a secret.
+
+---
+
 ## Demo script
 
 1. **Portfolio page** — ten models, four headline numbers, filterable by risk
@@ -391,8 +484,10 @@ built yet.
 
 - Docker Compose to start everything with one command
 - MLflow for experiment tracking instead of pickle files
-- Postgres in place of SQLite (`app/database.py` reads `DATABASE_URL`, so this
-  is a config change, not a rewrite)
+- Scheduled monitoring in the cloud — the monitors can target the deployed
+  registry, but something still has to run them on a timer
+- Alembic migrations. `create_all` builds missing tables but won't alter
+  existing ones, so a schema change currently means rebuilding the database
 - Authenticated identity — `approved_by` is free text, not a verified user
 - Role-based segregation of duties (three lines of defence) — designed, not
   yet enforced end to end

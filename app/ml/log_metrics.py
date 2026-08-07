@@ -15,28 +15,24 @@ nobody can vouch for.
 Run AFTER train_model.py (it needs data_train.csv to exist).
 """
 
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.database import SessionLocal
-from app.models.registry import MLModel
+from app.ml.registry_client import describe_target, fetch_model, get_client
 from app.ml.train_model import train
 
-client = TestClient(app)
+client = get_client()
 
 MODEL_NAME = "sme-credit-scorer"
 
 
 def log_real_metrics():
-    db = SessionLocal()
-    record = db.query(MLModel).filter(MLModel.name == MODEL_NAME).first()
+    print(f"📕 Registry: {describe_target()}\n")
+
+    record = fetch_model(client, MODEL_NAME)
     if record is None:
-        db.close()
         raise RuntimeError(
-            f"{MODEL_NAME} isn't in the registry. Run: python seed.py"
+            f"{MODEL_NAME} isn't in the registry at {describe_target()}. "
+            f"Run: python seed.py"
         )
-    model_id = record.id
-    db.close()
+    model_id = record["id"]
 
     _, metrics = train()
 

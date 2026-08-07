@@ -11,20 +11,18 @@ Run this AFTER:
     python -m app.ml.train_live_model (trains fx_anomaly_model.pkl)
 """
 
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.database import SessionLocal
-from app.models.registry import DataLineage
 from app.ml.live_feed import API_ROOT, BASE, BASKET, FEATURES
+from app.ml.registry_client import describe_target, get_client
 from app.ml.train_live_model import train
 
-client = TestClient(app)
+client = get_client()
 
 MODEL_NAME = "fx-exposure-monitor"
 
 
 def register_and_log():
+    print(f"📕 Registry: {describe_target()}\n")
+
     resp = client.post("/api/v1/models", json={
         "name": MODEL_NAME,
         "version": "v1.0.0",
@@ -69,24 +67,27 @@ def register_and_log():
     # Lineage goes in through the DB session directly — there is no create
     # endpoint for it, deliberately. Lineage is set once at registration and
     # shouldn't be casually editable through the API afterwards.
-    db = SessionLocal()
-    if not db.query(DataLineage).filter(DataLineage.model_id == model_id).first():
-        db.add(DataLineage(
-            model_id=model_id,
-            source_table=f"live: {API_ROOT} (ECB reference rates)",
-            features_used=list(FEATURES),
-            notes=(
-                "LIVE public API — rates are fetched at monitoring time, not read "
-                "from a stored file, so each run sees business days that did not "
-                "exist on the previous run. Unlike the credit models in this "
-                f"portfolio, no simulation is involved: these are the same {BASE}-based "
-                "ECB reference rates a treasury desk works from. Basket: "
-                + ", ".join(BASKET) + "."
-            ),
-        ))
-        db.commit()
-        print("✅ Lineage recorded (flagged as a live source).")
-    db.close()
+    # Lineage goes through the API, not a direct DB write — otherwise this
+    # script would silently write to a local SQLite file while registering the
+    # model against a deployed registry. The endpoint is idempotent, so
+    # re-running is safe.
+    lineage_resp = client.post(f"/api/v1/models/{model_id}/lineage", json={
+        "source_table": f"live: {API_ROOT} (ECB reference rates)",
+        "features_used": list(FEATURES),
+        "notes": (
+            "LIVE public API — rates are fetched at monitoring time, not read "
+            "from a stored file, so each run sees business days that did not "
+            "exist on the previous run. Unlike the credit models in this "
+            f"portfolio, no simulation is involved: these are the same {BASE}-based "
+            "ECB reference rates a treasury desk works from. Basket: "
+            + ", ".join(BASKET) + "."
+        ),
+    })
+    if lineage_resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"Failed to record lineage: HTTP {lineage_resp.status_code} {lineage_resp.text}"
+        )
+    print("✅ Lineage recorded (flagged as a live source).")
 
     _, metrics = train()
     for name, value in metrics.items():

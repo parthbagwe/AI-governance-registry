@@ -25,9 +25,25 @@ FEATURE_LABELS = {
 }
 
 
+MODEL_PATH = "sme_credit_model.pkl"
+
+
 def explain_applicant(applicant_row: dict):
-    with open("sme_credit_model.pkl", "rb") as f:
-        model = pickle.load(f)
+    try:
+        with open(MODEL_PATH, "rb") as f:
+            model = pickle.load(f)
+    except FileNotFoundError as e:
+        # Worth a specific message rather than a stack trace: this is the one
+        # place the API depends on a file on disk, and the failure mode differs
+        # by environment — locally you haven't trained yet, in a deployment the
+        # artifact wasn't shipped.
+        raise FileNotFoundError(
+            f"Trained model '{MODEL_PATH}' not found. "
+            f"Locally, run: python -m app.ml.train_model. "
+            f"In a deployment, the model artifact has to be shipped with the "
+            f"service — a production setup would pull it from a model registry "
+            f"or object store rather than the filesystem."
+        ) from e
 
     X = pd.DataFrame([applicant_row])[FEATURES]
 

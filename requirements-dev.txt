@@ -1,0 +1,24 @@
+# Everything needed to work on this locally: training, drift detection,
+# fairness testing, the live feeds, and the Streamlit dashboard.
+#
+# Install this on your own machine. The deployed API installs only
+# requirements.txt, which is a much smaller set.
+
+-r requirements.txt
+
+# Training and evaluation
+scikit-learn>=1.5
+
+# Drift detection
+evidently>=0.4
+
+# Streamlit dashboard (superseded by the Next.js frontend, still works)
+streamlit>=1.38
+plotly>=5.22
+
+# Live data feeds, and the HTTP client behind FastAPI's TestClient
+requests>=2.32
+httpx>=0.27
+
+# PDF audit reports
+reportlab>=4.0

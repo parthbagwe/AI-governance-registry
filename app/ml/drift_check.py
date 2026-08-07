@@ -13,14 +13,10 @@ If drift is detected on enough features, this automatically:
 import pandas as pd
 from evidently import Report
 from evidently.presets import DataDriftPreset
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.database import SessionLocal
-from app.models.registry import MLModel
+from app.ml.registry_client import describe_target, fetch_model, get_client
 from app.ml.train_model import FEATURES
 
-client = TestClient(app)
+client = get_client()
 
 # A model is considered "drifted enough to review" if this fraction
 # (or more) of its input features show statistically significant drift.
@@ -28,6 +24,8 @@ DRIFT_SHARE_THRESHOLD = 0.5
 
 
 def run_drift_check():
+    print(f"📕 Registry: {describe_target()}\n")
+
     reference = pd.read_csv("data_train.csv")[FEATURES]
     current = pd.read_csv("data_current.csv")[FEATURES]
 
@@ -50,10 +48,15 @@ def run_drift_check():
     print(f"\n📊 Drift check: {drift_share:.0%} of features show significant drift "
           f"(threshold: {DRIFT_SHARE_THRESHOLD:.0%})")
 
-    db = SessionLocal()
-    sme = db.query(MLModel).filter(MLModel.name == "sme-credit-scorer").first()
-    model_id, current_stage = sme.id, sme.stage.value
-    db.close()
+    # Read the model's current stage back through the API rather than the DB,
+    # so this behaves identically whether the registry is local or deployed.
+    sme = fetch_model(client, "sme-credit-scorer")
+    if sme is None:
+        raise RuntimeError(
+            f"sme-credit-scorer isn't registered on {describe_target()}. "
+            f"Run: python seed.py"
+        )
+    model_id, current_stage = sme["id"], sme["stage"]
 
     # Log the drift score into the registry regardless of outcome
     client.post(

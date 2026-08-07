@@ -29,15 +29,11 @@ import numpy as np
 import pandas as pd
 from evidently import Report
 from evidently.presets import DataDriftPreset
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.database import SessionLocal
-from app.models.registry import MLModel
 from app.ml.live_feed import FEATURES, current_window, snapshot
+from app.ml.registry_client import describe_target, fetch_model, get_client
 from app.ml.train_live_model import BASELINE_PATH, MODEL_PATH
 
-client = TestClient(app)
+client = get_client()
 
 MODEL_NAME = "fx-exposure-monitor"
 
@@ -66,18 +62,18 @@ def _measure_drift(reference: pd.DataFrame, current: pd.DataFrame) -> tuple[floa
 
 
 def run():
-    print(f"🕐 Live FX monitoring run — {datetime.now():%Y-%m-%d %H:%M:%S}\n")
+    print(f"🕐 Live FX monitoring run — {datetime.now():%Y-%m-%d %H:%M:%S}")
+    print(f"📕 Registry: {describe_target()}\n")
 
-    db = SessionLocal()
-    record = db.query(MLModel).filter(MLModel.name == MODEL_NAME).first()
+    # Read the model's current stage back through the API rather than the DB,
+    # so this behaves identically whether the registry is local or deployed.
+    record = fetch_model(client, MODEL_NAME)
     if record is None:
-        db.close()
         raise RuntimeError(
-            f"{MODEL_NAME} isn't registered yet. "
+            f"{MODEL_NAME} isn't registered on {describe_target()}. "
             f"Run: python -m app.ml.register_live_model"
         )
-    model_id, stage = record.id, record.stage.value
-    db.close()
+    model_id, stage = record["id"], record["stage"]
 
     with open(MODEL_PATH, "rb") as f:
         detector = pickle.load(f)

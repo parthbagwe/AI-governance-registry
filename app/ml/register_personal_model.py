@@ -7,17 +7,15 @@ which stays synthetic (since real GST data isn't public).
 Run this AFTER prepare_real_data.py and train_personal_model.py.
 """
 
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.database import SessionLocal
-from app.models.registry import DataLineage
+from app.ml.registry_client import describe_target, get_client
 from app.ml.train_personal_model import train
 
-client = TestClient(app)
+client = get_client()
 
 
 def register_and_log():
+    print(f"📕 Registry: {describe_target()}\n")
+
     # 1. Register the model (starts in PILOT by default)
     resp = client.post("/api/v1/models", json={
         "name": "personal-loan-credit-scorer",
@@ -44,29 +42,29 @@ def register_and_log():
     model_id = model["id"]
     print(f"✅ Registered personal-loan-credit-scorer (id={model_id})")
 
-    # 2. Record data lineage directly via DB session (no API endpoint exists
-    # for creating lineage — only for reading it, since lineage is meant to
-    # be set once at registration time, not edited casually through the API)
-    db = SessionLocal()
-    existing = db.query(DataLineage).filter(DataLineage.model_id == model_id).first()
-    if not existing:
-        db.add(DataLineage(
-            model_id=model_id,
-            source_table="kaggle_give_me_some_credit_2011",
-            features_used=[
-                "revolving_utilization", "age", "late_30_59_days", "debt_ratio",
-                "monthly_income", "open_credit_lines", "late_90_days",
-                "real_estate_loans", "late_60_89_days", "dependents",
-            ],
-            notes=(
-                "REAL public dataset (Kaggle 'Give Me Some Credit', 2011 competition), "
-                "unlike sme-credit-scorer which uses synthetic data since real GST "
-                "filing records are not publicly available."
-            ),
-        ))
-        db.commit()
-        print("✅ Data lineage recorded (flagged as real public data).")
-    db.close()
+    # 2. Record data lineage through the API, not a direct DB write —
+    # otherwise this would write to a local SQLite file while registering the
+    # model against a deployed registry. The endpoint is create-only and
+    # idempotent: lineage is a historical fact about a version, so it can be
+    # stated once but never quietly rewritten.
+    lineage_resp = client.post(f"/api/v1/models/{model_id}/lineage", json={
+        "source_table": "kaggle_give_me_some_credit_2011",
+        "features_used": [
+            "revolving_utilization", "age", "late_30_59_days", "debt_ratio",
+            "monthly_income", "open_credit_lines", "late_90_days",
+            "real_estate_loans", "late_60_89_days", "dependents",
+        ],
+        "notes": (
+            "REAL public dataset (Kaggle 'Give Me Some Credit', 2011 competition), "
+            "unlike sme-credit-scorer which uses synthetic data since real GST "
+            "filing records are not publicly available."
+        ),
+    })
+    if lineage_resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"Failed to record lineage: HTTP {lineage_resp.status_code} {lineage_resp.text}"
+        )
+    print("✅ Data lineage recorded (flagged as real public data).")
 
     # 3. Train and log real metrics
     _, metrics = train()
