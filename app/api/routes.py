@@ -171,9 +171,17 @@ def get_history(model_id: str, db: Session = Depends(get_db)):
 
 @router.post("/models/{model_id}/metrics", response_model=MetricResponse, status_code=201)
 def log_metric(model_id: str, payload: MetricCreate, db: Session = Depends(get_db)):
-    """Log a single performance metric snapshot for a model."""
+    """
+    Log a single performance metric snapshot for a model.
+
+    `recorded_at` may be supplied to backfill historical monitoring data.
+    That's deliberate and limited: a measurement legitimately belongs to the
+    date it describes. Approvals have no such field — see MetricCreate.
+    """
     _get_model_or_404(db, model_id)
-    metric = ModelMetric(model_id=model_id, **payload.model_dump())
+
+    fields = payload.model_dump(exclude_none=True)
+    metric = ModelMetric(model_id=model_id, **fields)
     db.add(metric)
     db.commit()
     db.refresh(metric)

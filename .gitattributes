@@ -1,0 +1,41 @@
+# Line-ending and diff behaviour.
+#
+# Without this file, git guesses per-file. That guessing is mostly harmless
+# for source code and actively dangerous for the two binary-ish things this
+# repo now contains — see below.
+
+# Normalise text files to LF in the repository. Windows checkouts still get
+# CRLF locally; this only governs what's stored. It also stops the
+# "LF will be replaced by CRLF" warnings on every `git add`.
+* text=auto
+
+# Explicitly text, so nothing gets misdetected as binary.
+*.py    text diff=python
+*.md    text
+*.ts    text
+*.tsx   text
+*.json  text
+*.yaml  text
+*.yml   text
+*.css   text
+*.txt   text
+
+# Shell scripts must keep LF even when checked out on Windows — a CRLF in a
+# shebang line makes the script unrunnable on Linux, which is exactly where
+# the deployed service runs.
+*.sh    text eol=lf
+
+# BINARY. This is the one that matters.
+#
+# sme_credit_model.pkl is a pickled XGBoost model, committed deliberately so
+# the deployed /explain endpoint has something to load. If git ever applied
+# line-ending conversion to it, every 0x0A byte inside the binary would be
+# rewritten and the file would arrive on the server corrupted — loading it
+# would fail with a confusing unpickling error that looks nothing like its
+# actual cause.
+*.pkl   binary
+
+# CSVs are treated as binary too: they're data, not source. Diffing a 150,000
+# row file is pointless, and conversion risks mangling any field that legally
+# contains a newline inside quotes.
+*.csv   binary

@@ -1,5 +1,6 @@
 import { Activity, AlertTriangle, ClipboardCheck, Layers } from "lucide-react";
 import type { MLModel } from "@/lib/types";
+import { CountUp } from "@/components/Motion";
 
 /**
  * The four numbers a risk committee actually opens this page to see, before
@@ -44,14 +45,14 @@ export function PortfolioStats({ models }: { models: MLModel[] }) {
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => (
-        <div key={c.label} className="panel p-4">
+        <div key={c.label} className="panel lift p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="label">{c.label}</p>
               <p className="mt-2 text-3xl font-semibold tabular-nums text-white">
-                {c.value}
+                <CountUp value={c.value} />
               </p>
             </div>
             <span

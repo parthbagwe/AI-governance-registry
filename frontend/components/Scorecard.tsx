@@ -50,7 +50,7 @@ export function Scorecard({ model }: { model: MLModel }) {
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                 <div
-                  className={`h-full rounded-full transition-all ${barTone(value)}`}
+                  className={`grow h-full rounded-full ${barTone(value)}`}
                   style={{ width: `${((value ?? 0) / 10) * 100}%` }}
                 />
               </div>

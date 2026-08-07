@@ -161,6 +161,12 @@ export function MetricChart({ metrics }: { metrics: ModelMetric[] }) {
                   strokeWidth={2}
                   dot={false}
                   connectNulls
+                  // Draws left to right on mount. On the backtest series this
+                  // is the whole point: the line runs flat through January and
+                  // February and then falls off a cliff, and watching it
+                  // arrive in order lands harder than seeing it already drawn.
+                  animationDuration={1400}
+                  animationEasing="ease-out"
                 />
               ))}
             </LineChart>

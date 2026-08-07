@@ -21,6 +21,7 @@ import { AuditTrail } from "@/components/AuditTrail";
 import { LineagePanel } from "@/components/LineagePanel";
 import { ActionPanel } from "@/components/ActionPanel";
 import { ExplainPanel } from "@/components/ExplainPanel";
+import { Reveal } from "@/components/Motion";
 
 export default function ModelDetailPage() {
   const params = useParams<{ id: string }>();
@@ -82,7 +83,7 @@ export default function ModelDetailPage() {
         Back to portfolio
       </Link>
 
-      <div className="panel p-6">
+      <div className="panel rise p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
@@ -132,19 +133,29 @@ export default function ModelDetailPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Scorecard model={model} />
-        <ActionPanel model={model} onChanged={handleChanged} />
-      </div>
+      <Reveal>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Scorecard model={model} />
+          <ActionPanel model={model} onChanged={handleChanged} />
+        </div>
+      </Reveal>
 
-      <MetricChart metrics={metrics} />
+      <Reveal>
+        <MetricChart metrics={metrics} />
+      </Reveal>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <AuditTrail events={history} />
-        <LineagePanel lineage={lineage} />
-      </div>
+      <Reveal>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <AuditTrail events={history} />
+          <LineagePanel lineage={lineage} />
+        </div>
+      </Reveal>
 
-      {model.name === "sme-credit-scorer" && <ExplainPanel modelId={model.id} />}
+      {model.name === "sme-credit-scorer" && (
+        <Reveal>
+          <ExplainPanel modelId={model.id} />
+        </Reveal>
+      )}
     </div>
   );
 }

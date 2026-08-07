@@ -29,9 +29,10 @@ class _RemoteClient:
     """
     Minimal stand-in for TestClient over real HTTP.
 
-    Only `get` and `post` are implemented, because that's all the monitors
-    use. The returned object exposes `.status_code`, `.json()` and `.text`,
-    so calling code doesn't need to know which transport it got.
+    Implements the same `get`/`post`/`patch` signatures TestClient exposes,
+    including the `json=` keyword, so calling code never has to know which
+    transport it got. The returned object exposes `.status_code`, `.json()`
+    and `.text` either way.
     """
 
     def __init__(self, base_url: str):
@@ -48,6 +49,9 @@ class _RemoteClient:
 
     def post(self, path: str, **kwargs: Any):
         return self._requests.post(self._url(path), timeout=60, **kwargs)
+
+    def patch(self, path: str, **kwargs: Any):
+        return self._requests.patch(self._url(path), timeout=30, **kwargs)
 
 
 def get_client():

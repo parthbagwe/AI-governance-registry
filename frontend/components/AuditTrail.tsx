@@ -22,7 +22,7 @@ export function AuditTrail({ events }: { events: ApprovalEvent[] }) {
         {events.length === 0 ? (
           <Empty>No recorded events for this model.</Empty>
         ) : (
-          <ol className="relative space-y-5 border-l border-white/[0.08] pl-6">
+          <ol className="stagger relative space-y-5 border-l border-white/[0.08] pl-6">
             {events.map((e, i) => (
               <li key={i} className="relative">
                 <span

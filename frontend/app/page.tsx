@@ -74,7 +74,7 @@ export default function RegistryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-white">
             Model portfolio
@@ -99,7 +99,7 @@ export default function RegistryPage() {
 
       <PortfolioStats models={models} />
 
-      <details className="panel group px-4 py-3 open:pb-4">
+      <details className="panel group rise px-4 py-3 open:pb-4" style={{ animationDelay: "0.3s" }}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-slate-300">
           <Info className="h-4 w-4 text-sky-400" />
           What am I looking at?
@@ -161,7 +161,7 @@ export default function RegistryPage() {
           )}
         </Empty>
       ) : (
-        <div className="panel overflow-hidden">
+        <div className="panel rise overflow-hidden" style={{ animationDelay: "0.4s" }}>
           {/* Table on desktop, stacked cards on mobile — same data, no truncation. */}
           <div className="hidden grid-cols-[minmax(0,2.4fr)_auto_auto_auto_auto] items-center gap-4 border-b border-white/[0.06] px-5 py-3 md:grid">
             <span className="label">Model</span>
@@ -218,7 +218,7 @@ function ModelRow({ model }: { model: MLModel }) {
   return (
     <Link
       href={`/models/${model.id}`}
-      className="grid grid-cols-1 gap-3 px-5 py-4 transition hover:bg-white/[0.03] md:grid-cols-[minmax(0,2.4fr)_auto_auto_auto_auto] md:items-center md:gap-4"
+      className="group/row grid grid-cols-1 gap-3 px-5 py-4 transition-colors duration-300 hover:bg-white/[0.035] md:grid-cols-[minmax(0,2.4fr)_auto_auto_auto_auto] md:items-center md:gap-4"
     >
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
@@ -251,7 +251,9 @@ function ModelRow({ model }: { model: MLModel }) {
         </div>
       </div>
 
-      <ChevronRight className="hidden h-4 w-4 text-slate-700 md:block" />
+      {/* Nudges right on hover — the only bit of pure decoration here, and it
+          earns its place by signalling the row is clickable. */}
+      <ChevronRight className="hidden h-4 w-4 text-slate-700 transition-transform duration-300 group-hover/row:translate-x-1 group-hover/row:text-slate-400 md:block" />
     </Link>
   );
 }

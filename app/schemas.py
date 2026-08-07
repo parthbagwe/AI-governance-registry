@@ -42,6 +42,16 @@ class MetricCreate(BaseModel):
     metric_name: str
     metric_value: float
 
+    # Optional, for backfilling historical monitoring data — e.g. replaying a
+    # model's performance across a past period. Defaults to now.
+    #
+    # Note there is deliberately no equivalent on ApprovalRequest. Backfilling
+    # a *measurement* is honest bookkeeping: the number genuinely describes
+    # that date. Backdating an *approval* would mean the audit trail could be
+    # made to say a decision was taken earlier than it was, which is the one
+    # thing an audit trail exists to prevent.
+    recorded_at: Optional[datetime] = None
+
 
 class ModelResponse(BaseModel):
     id: str

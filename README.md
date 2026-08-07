@@ -229,6 +229,61 @@ net direction of the basket.
 
 ---
 
+## The month a model stopped working
+
+Everything else here demonstrates governance on data that happens to be
+well-behaved. `app/ml/backtest_2020.py` reconstructs the case governance
+actually exists for.
+
+No simulation and no injected drift. Real ECB reference rates, 2018 to 2021.
+`fx-exposure-monitor` **v0.9.0** is trained on 2018-2019 — a genuinely calm
+stretch for FX — scored 7.5/10, and promoted to production in January 2020 on
+metrics that were, at the time, entirely good. Then it's walked forward month
+by month through 2020 on data it has never seen.
+
+In March 2020 it breaks. Not gradually. A model whose notion of a normal
+trading day was built in 2019 has nothing useful to say about the pandemic
+crash, so its anomaly rate goes from the 2% it was configured for to a large
+fraction of every trading day. A detector firing on a third of all days isn't
+detecting anything — it's reporting that its idea of normal no longer exists.
+
+```powershell
+python -m app.ml.backtest_2020
+```
+
+Open `fx-exposure-monitor v0.9.0` in the dashboard afterwards. The chart runs
+flat through January and February and then falls off a cliff, and the audit
+trail shows the model being pulled on the date it happened.
+
+**Why it's registered as v0.9.0 rather than as its own model.** The registry
+keys on `(name, version)`. So `fx-exposure-monitor` now has two versions on the
+record: v0.9.0, retired in June 2020 after the regime it encoded stopped
+existing, and v1.0.0, live today. One model, two versions, separate histories,
+both auditable. That's the schema being used for the thing it was designed
+for rather than being demonstrated in the abstract.
+
+**What makes this worth showing.** Nothing about v0.9.0 was negligent. It was
+trained on real data, validated properly, reviewed independently, and cleared
+its governance bar. It still failed, because the world changed. That's the
+argument for continuous monitoring in one example: approval is a statement
+about the world at a point in time, and models don't decay on their own — the
+ground moves under them.
+
+### One thing the backtest cannot do
+
+It backfills *metrics* to the dates they describe, because a measurement
+genuinely belongs to its date, and the API accepts `recorded_at` for exactly
+that reason.
+
+It cannot backfill *approvals* through the API — `ApprovalRequest` has no
+timestamp field and won't be given one. An audit trail whose dates can be
+chosen is not an audit trail. The historical lifecycle is therefore written
+directly to the database by the script, which is the same thing `seed.py`
+does: constructing a scenario is a different activity from operating the
+registry, and the live system has no route to rewrite its own history.
+
+---
+
 ## Two models, one market, different governance
 
 `fx-exposure-monitor` and `fx-intraday-monitor` watch the same currency,

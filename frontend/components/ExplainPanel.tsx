@@ -181,7 +181,7 @@ export function ExplainPanel({ modelId }: { modelId: string }) {
                     </div>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                       <div
-                        className={`h-full rounded-full ${
+                        className={`grow h-full rounded-full ${
                           up ? "bg-rose-400" : "bg-emerald-400"
                         }`}
                         style={{ width: `${width}%` }}

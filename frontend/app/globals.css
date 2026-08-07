@@ -53,6 +53,121 @@ body {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Motion.
+
+   Borrowed from high-end studio sites in principle, not in volume: slow
+   confident easing, things arriving from slightly below with a short stagger,
+   nothing bouncing or spinning. A governance tool that feels playful reads as
+   a toy, so every duration here is long enough to notice and short enough not
+   to make anyone wait, and nothing moves more than 14px.
+
+   The custom easing curve is the single biggest contributor to it feeling
+   considered rather than default — linear and ease-out both read as cheap.
+--------------------------------------------------------------------------- */
+
+:root {
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes draw {
+  from { stroke-dashoffset: var(--dash, 1200); }
+  to { stroke-dashoffset: 0; }
+}
+
+@layer components {
+  /* Applied to anything that should arrive rather than appear. */
+  .rise {
+    animation: rise 0.7s var(--ease-out-soft) both;
+  }
+
+  .fade-in {
+    animation: fade 0.5s var(--ease-out-soft) both;
+  }
+
+  /* Stagger children of a container. Capped at 10 — past that the last item
+     waits so long it reads as a bug rather than a flourish. */
+  .stagger > * {
+    animation: rise 0.7s var(--ease-out-soft) both;
+  }
+  .stagger > *:nth-child(1)  { animation-delay: 0.00s; }
+  .stagger > *:nth-child(2)  { animation-delay: 0.05s; }
+  .stagger > *:nth-child(3)  { animation-delay: 0.10s; }
+  .stagger > *:nth-child(4)  { animation-delay: 0.15s; }
+  .stagger > *:nth-child(5)  { animation-delay: 0.20s; }
+  .stagger > *:nth-child(6)  { animation-delay: 0.25s; }
+  .stagger > *:nth-child(7)  { animation-delay: 0.30s; }
+  .stagger > *:nth-child(8)  { animation-delay: 0.35s; }
+  .stagger > *:nth-child(9)  { animation-delay: 0.40s; }
+  .stagger > *:nth-child(n + 10) { animation-delay: 0.45s; }
+
+  /* Scroll-triggered. Starts hidden; the observer adds .is-visible. */
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    transition:
+      opacity 0.8s var(--ease-out-soft),
+      transform 0.8s var(--ease-out-soft);
+    will-change: opacity, transform;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  /* Panels lift very slightly on hover — 2px, enough to feel responsive
+     without turning a data table into a trampoline. */
+  .lift {
+    transition:
+      transform 0.4s var(--ease-out-soft),
+      border-color 0.4s var(--ease-out-soft),
+      background-color 0.4s var(--ease-out-soft);
+  }
+  .lift:hover {
+    transform: translate3d(0, -2px, 0);
+  }
+
+  /* Scorecard and progress bars grow into place rather than snapping. */
+  .grow {
+    transition: width 1s var(--ease-out-soft);
+  }
+}
+
+/* Anyone who has asked their OS to reduce motion gets none of it. This isn't
+   a nicety — vestibular disorders make parallax and large transforms
+   genuinely unpleasant, and a finance tool has no business insisting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Scrollbars, so long audit trails don't look like a browser default. */
 ::-webkit-scrollbar {
   width: 10px;
