@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Preloader } from "@/components/Preloader";
+import { RouteTransition } from "@/components/RouteTransition";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body className="font-sans text-slate-200 antialiased">
         <Preloader />
         <SmoothScroll />
+        <RouteTransition />
 
         <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">

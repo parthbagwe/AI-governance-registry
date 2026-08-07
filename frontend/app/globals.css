@@ -207,6 +207,35 @@ html.lenis body {
   to   { transform: scaleX(1); }
 }
 
+/* A light travelling across skeleton placeholders. Pulsing opacity alone reads
+   as "broken and blinking"; a directional sweep reads as "working on it",
+   because the movement implies progress even though it measures none. */
+@keyframes shimmer {
+  from { background-position: -160% 0; }
+  to   { background-position: 260% 0; }
+}
+
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.05) 38%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.05) 62%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+}
+
 /* Anyone who has asked their OS to reduce motion gets none of it. This isn't
    a nicety — vestibular disorders make parallax and large transforms
    genuinely unpleasant, and a finance tool has no business insisting. */

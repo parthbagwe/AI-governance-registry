@@ -12,6 +12,7 @@ import { PortfolioStats } from "@/components/PortfolioStats";
 import { TextReveal } from "@/components/TextReveal";
 import { StatsSkeleton, TableSkeleton } from "@/components/Skeleton";
 import { LineageExport } from "@/components/LineageExport";
+import { useMinDuration } from "@/lib/useMinDuration";
 import { Empty, ErrorState } from "@/components/States";
 
 type StageFilter = ModelStage | "all";
@@ -82,6 +83,11 @@ export default function RegistryPage() {
   // The masthead renders immediately and the data slots in underneath, rather
   // than the whole page being replaced by a spinner. There's nothing you need
   // to wait for in order to know what this page is.
+  //
+  // The floor stops the skeleton flashing on a fast local API — below about
+  // 400ms a loading state that appears and vanishes reads as a glitch.
+  const pending = useMinDuration(models === null, 500);
+
   if (error) return <ErrorState message={error} />;
 
   return (
@@ -133,9 +139,13 @@ export default function RegistryPage() {
         <div className="rule mt-8" style={{ animationDelay: "0.5s" }} />
       </section>
 
-      {/* Null-checked inline rather than via the `loading` flag, so TypeScript
+      {/* Null-checked inline as well as via the timing floor, so TypeScript
           narrows the type and PortfolioStats never sees a nullable prop. */}
-      {models === null ? <StatsSkeleton /> : <PortfolioStats models={models} />}
+      {pending || models === null ? (
+        <StatsSkeleton />
+      ) : (
+        <PortfolioStats models={models} />
+      )}
 
       <details className="panel group rise px-4 py-3 open:pb-4" style={{ animationDelay: "0.3s" }}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-slate-300">
@@ -193,7 +203,7 @@ export default function RegistryPage() {
         />
       </div>
 
-      {models === null ? (
+      {pending || models === null ? (
         <TableSkeleton />
       ) : filtered.length === 0 ? (
         <Empty>

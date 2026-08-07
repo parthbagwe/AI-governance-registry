@@ -17,6 +17,7 @@ import {
 import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
 import { ErrorState } from "@/components/States";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { useMinDuration } from "@/lib/useMinDuration";
 import { Scorecard } from "@/components/Scorecard";
 import { MetricChart } from "@/components/MetricChart";
 import { MetricsLog } from "@/components/MetricsLog";
@@ -76,8 +77,13 @@ export default function ModelDetailPage() {
     [load]
   );
 
+  // Held for at least 500ms so the skeleton settles instead of flashing. On a
+  // fast local API the four fetches resolve in well under that; on a cold
+  // deployed one the floor has long since passed and costs nothing.
+  const showSkeleton = useMinDuration(model === null, 500);
+
   if (error) return <ErrorState message={error} />;
-  if (!model) return <DetailSkeleton />;
+  if (!model || showSkeleton) return <DetailSkeleton />;
 
   return (
     <div className="space-y-6">

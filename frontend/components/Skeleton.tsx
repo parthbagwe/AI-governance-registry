@@ -14,7 +14,10 @@
 function Bar({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded bg-white/[0.06] ${className}`}
+      className={`shimmer rounded ${className}`}
+      // Inherits the row's stagger where one is set, so the highlight sweeps
+      // down a list instead of every placeholder pulsing together.
+      style={{ animationDelay: "var(--shimmer-delay, 0ms)" }}
     />
   );
 }
@@ -46,9 +49,9 @@ export function TableSkeleton({ rows = 6 }: { rows?: number }) {
           <li
             key={i}
             className="flex items-center justify-between gap-4 px-5 py-4"
-            // Each row starts its pulse slightly later, so the block reads as
-            // a list arriving rather than one flashing rectangle.
-            style={{ animationDelay: `${i * 90}ms` }}
+            // Each row's shimmer starts slightly later, so the light travels
+            // down the list rather than every row flashing in unison.
+            style={{ ["--shimmer-delay" as string]: `${i * 90}ms` }}
           >
             <div className="min-w-0 flex-1">
               <Bar className="h-3.5 w-48 max-w-full" />

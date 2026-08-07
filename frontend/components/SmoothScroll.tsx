@@ -17,6 +17,29 @@ import Lenis from "lenis";
  * Hijacking scroll is the most invasive thing on this page, and for someone
  * with a vestibular disorder it's the difference between usable and not.
  */
+declare global {
+  interface Window {
+    __lenis?: Lenis;
+  }
+}
+
+/**
+ * Jumps to the top instantly.
+ *
+ * Needed because Lenis owns the scroll position, so a plain window.scrollTo
+ * gets overridden on the next frame and you land halfway down the new page —
+ * which reads as the site being broken rather than as a scroll quirk.
+ */
+export function resetScroll() {
+  if (typeof window === "undefined") return;
+  const lenis = window.__lenis;
+  if (lenis) {
+    lenis.scrollTo(0, { immediate: true });
+  } else {
+    window.scrollTo(0, 0);
+  }
+}
+
 export function SmoothScroll() {
   useEffect(() => {
     const reduced = window.matchMedia?.(
@@ -33,6 +56,10 @@ export function SmoothScroll() {
       syncTouch: false,
     });
 
+    // Exposed so route changes can reset the scroll position — see
+    // resetScroll() above for why window.scrollTo isn't enough.
+    window.__lenis = lenis;
+
     let frame = 0;
     const raf = (time: number) => {
       lenis.raf(time);
@@ -43,6 +70,7 @@ export function SmoothScroll() {
     return () => {
       cancelAnimationFrame(frame);
       lenis.destroy();
+      delete window.__lenis;
     };
   }, []);
 
