@@ -10,13 +10,24 @@ import { Empty } from "@/components/States";
  * reverse question tractable: if a source table turns out to be wrong, which
  * models need re-review?
  */
-export function LineagePanel({ lineage }: { lineage: DataLineage[] }) {
+export function LineagePanel({
+  lineage,
+  action,
+}: {
+  lineage: DataLineage[];
+  action?: React.ReactNode;
+}) {
   return (
     <section className="panel p-5">
-      <h2 className="text-sm font-semibold text-white">Data lineage</h2>
-      <p className="mt-1 text-xs text-slate-500">
-        The sources and fields this model version was built on.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Data lineage</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            The sources and fields this model version was built on.
+          </p>
+        </div>
+        {action}
+      </div>
 
       <div className="mt-5 space-y-3">
         {lineage.length === 0 ? (

@@ -115,3 +115,23 @@ class LineageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LineageExportRow(BaseModel):
+    """
+    One row per (model version, data source), flattened for export.
+
+    Denormalised on purpose. The consumer is a person opening a spreadsheet or
+    an auditor asking "which models touch this table?", and neither wants to
+    join two files to find out. Model identity is repeated on every row so each
+    line stands on its own.
+    """
+    model_id: str
+    model_name: str
+    model_version: str
+    stage: ModelStage
+    risk_tier: RiskTier
+    owner: str
+    source_table: str
+    features_used: List[str]
+    notes: Optional[str]

@@ -19,8 +19,10 @@ import { ErrorState } from "@/components/States";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { Scorecard } from "@/components/Scorecard";
 import { MetricChart } from "@/components/MetricChart";
+import { MetricsLog } from "@/components/MetricsLog";
 import { AuditTrail } from "@/components/AuditTrail";
 import { LineagePanel } from "@/components/LineagePanel";
+import { ModelLineageExport } from "@/components/LineageExport";
 import { ActionPanel } from "@/components/ActionPanel";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { Reveal } from "@/components/Motion";
@@ -152,9 +154,28 @@ export default function ModelDetailPage() {
       </Reveal>
 
       <Reveal>
+        <MetricsLog
+          metrics={metrics}
+          modelName={model.name}
+          modelVersion={model.version}
+        />
+      </Reveal>
+
+      <Reveal>
         <div className="grid gap-6 lg:grid-cols-2">
           <AuditTrail events={history} />
-          <LineagePanel lineage={lineage} />
+          <LineagePanel
+            lineage={lineage}
+            action={
+              lineage.length > 0 ? (
+                <ModelLineageExport
+                  modelId={model.id}
+                  modelName={model.name}
+                  modelVersion={model.version}
+                />
+              ) : null
+            }
+          />
         </div>
       </Reveal>
 

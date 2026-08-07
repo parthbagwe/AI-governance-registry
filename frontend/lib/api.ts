@@ -13,6 +13,7 @@ import type {
   ModelMetric,
   ApprovalEvent,
   DataLineage,
+  LineageExportRow,
   ModelStage,
   ExplainResult,
 } from "./types";
@@ -76,6 +77,9 @@ export const api = {
   getHistory: (id: string) => request<ApprovalEvent[]>(`/models/${id}/history`),
 
   getLineage: (id: string) => request<DataLineage[]>(`/models/${id}/lineage`),
+
+  /** Every data source across every model version — one row per pairing. */
+  exportLineage: () => request<LineageExportRow[]>("/lineage"),
 
   approve: (
     id: string,

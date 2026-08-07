@@ -61,6 +61,18 @@ export interface DataLineage {
   notes: string | null;
 }
 
+export interface LineageExportRow {
+  model_id: string;
+  model_name: string;
+  model_version: string;
+  stage: ModelStage;
+  risk_tier: RiskTier;
+  owner: string;
+  source_table: string;
+  features_used: string[];
+  notes: string | null;
+}
+
 export interface ExplainFactor {
   feature: string;
   value: number;

@@ -8,7 +8,7 @@ from app.models.registry import MLModel, ModelMetric, ApprovalEvent, DataLineage
 from app.schemas import (
     ModelCreate, ModelResponse, ScoreUpdate, ApprovalRequest,
     MetricCreate, MetricResponse, ApprovalEventResponse,
-    LineageCreate, LineageResponse,
+    LineageCreate, LineageResponse, LineageExportRow,
 )
 from app.workflow import validate_transition, InvalidTransitionError, GovernanceGateError, kill_switch
 
@@ -31,6 +31,43 @@ def _to_response(model: MLModel) -> ModelResponse:
     resp = ModelResponse.model_validate(model)
     resp.governance_score = model.governance_score
     return resp
+
+
+@router.get("/lineage", response_model=List[LineageExportRow])
+def export_lineage(db: Session = Depends(get_db)):
+    """
+    Every data source, across every model version, in one call.
+
+    This is the query a data steward actually needs and which a per-model
+    endpoint can't answer: *if this table changed, which models are affected?*
+    Asking that ten times, once per model, and joining the answers by hand is
+    exactly the manual process a lineage register exists to remove.
+
+    Declared before /models/{model_id} would matter if the paths collided —
+    they don't here, but the ordering is kept deliberate so a future
+    /lineage/{something} doesn't get swallowed by a wildcard route.
+    """
+    rows = (
+        db.query(DataLineage, MLModel)
+        .join(MLModel, DataLineage.model_id == MLModel.id)
+        .order_by(MLModel.name.asc(), MLModel.version.asc(), DataLineage.source_table.asc())
+        .all()
+    )
+
+    return [
+        LineageExportRow(
+            model_id=model.id,
+            model_name=model.name,
+            model_version=model.version,
+            stage=model.stage,
+            risk_tier=model.risk_tier,
+            owner=model.owner,
+            source_table=lineage.source_table,
+            features_used=lineage.features_used,
+            notes=lineage.notes,
+        )
+        for lineage, model in rows
+    ]
 
 
 @router.get("/models", response_model=List[ModelResponse])

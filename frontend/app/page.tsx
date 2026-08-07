@@ -11,6 +11,7 @@ import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
 import { PortfolioStats } from "@/components/PortfolioStats";
 import { TextReveal } from "@/components/TextReveal";
 import { StatsSkeleton, TableSkeleton } from "@/components/Skeleton";
+import { LineageExport } from "@/components/LineageExport";
 import { Empty, ErrorState } from "@/components/States";
 
 type StageFilter = ModelStage | "all";
@@ -110,18 +111,23 @@ export default function RegistryPage() {
             delay={620}
             stagger={14}
           />
-          <button
-            onClick={load}
-            disabled={refreshing}
-            className="btn-ghost fade-in"
+          <div
+            className="fade-in flex flex-wrap items-center gap-2"
             style={{ animationDelay: "1s" }}
-            aria-label="Refresh the registry"
           >
-            <RefreshCw
-              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </button>
+            <LineageExport />
+            <button
+              onClick={load}
+              disabled={refreshing}
+              className="btn-ghost"
+              aria-label="Refresh the registry"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="rule mt-8" style={{ animationDelay: "0.5s" }} />
