@@ -1,13 +1,4 @@
-import { Loader2, PlugZap } from "lucide-react";
-
-export function Loading({ label = "Loading…" }: { label?: string }) {
-  return (
-    <div className="flex items-center justify-center gap-3 py-24 text-sm text-slate-500">
-      <Loader2 className="h-4 w-4 animate-spin" />
-      {label}
-    </div>
-  );
-}
+import { PlugZap } from "lucide-react";
 
 /**
  * The most common failure in this app by far is "the FastAPI server isn't

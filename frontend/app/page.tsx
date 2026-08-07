@@ -10,7 +10,8 @@ import { isLiveSource, type MLModel, type ModelStage, type RiskTier } from "@/li
 import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
 import { PortfolioStats } from "@/components/PortfolioStats";
 import { TextReveal } from "@/components/TextReveal";
-import { Empty, ErrorState, Loading } from "@/components/States";
+import { StatsSkeleton, TableSkeleton } from "@/components/Skeleton";
+import { Empty, ErrorState } from "@/components/States";
 
 type StageFilter = ModelStage | "all";
 type RiskFilter = RiskTier | "all";
@@ -77,8 +78,10 @@ export default function RegistryPage() {
     });
   }, [models, query, stage, risk, source]);
 
+  // The masthead renders immediately and the data slots in underneath, rather
+  // than the whole page being replaced by a spinner. There's nothing you need
+  // to wait for in order to know what this page is.
   if (error) return <ErrorState message={error} />;
-  if (!models) return <Loading label="Loading the model registry…" />;
 
   return (
     <div className="space-y-6">
@@ -124,7 +127,9 @@ export default function RegistryPage() {
         <div className="rule mt-8" style={{ animationDelay: "0.5s" }} />
       </section>
 
-      <PortfolioStats models={models} />
+      {/* Null-checked inline rather than via the `loading` flag, so TypeScript
+          narrows the type and PortfolioStats never sees a nullable prop. */}
+      {models === null ? <StatsSkeleton /> : <PortfolioStats models={models} />}
 
       <details className="panel group rise px-4 py-3 open:pb-4" style={{ animationDelay: "0.3s" }}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-slate-300">
@@ -182,7 +187,9 @@ export default function RegistryPage() {
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {models === null ? (
+        <TableSkeleton />
+      ) : filtered.length === 0 ? (
         <Empty>
           No models match those filters.{" "}
           {models.length === 0 && (

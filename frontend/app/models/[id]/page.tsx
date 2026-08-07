@@ -15,7 +15,8 @@ import {
   type ModelMetric,
 } from "@/lib/types";
 import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
-import { ErrorState, Loading } from "@/components/States";
+import { ErrorState } from "@/components/States";
+import { DetailSkeleton } from "@/components/Skeleton";
 import { Scorecard } from "@/components/Scorecard";
 import { MetricChart } from "@/components/MetricChart";
 import { AuditTrail } from "@/components/AuditTrail";
@@ -73,7 +74,7 @@ export default function ModelDetailPage() {
   );
 
   if (error) return <ErrorState message={error} />;
-  if (!model) return <Loading label="Loading model…" />;
+  if (!model) return <DetailSkeleton />;
 
   return (
     <div className="space-y-6">
