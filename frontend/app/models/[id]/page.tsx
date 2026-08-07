@@ -23,6 +23,7 @@ import { MetricsLog } from "@/components/MetricsLog";
 import { AuditTrail } from "@/components/AuditTrail";
 import { LineagePanel } from "@/components/LineagePanel";
 import { ModelLineageExport } from "@/components/LineageExport";
+import { DatasetPanel } from "@/components/DatasetPanel";
 import { ActionPanel } from "@/components/ActionPanel";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { Reveal } from "@/components/Motion";
@@ -177,6 +178,10 @@ export default function ModelDetailPage() {
             }
           />
         </div>
+      </Reveal>
+
+      <Reveal>
+        <DatasetPanel modelId={model.id} />
       </Reveal>
 
       {model.name === "sme-credit-scorer" && (

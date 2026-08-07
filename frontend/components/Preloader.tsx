@@ -27,6 +27,19 @@ const SESSION_KEY = "governance-registry-preloaded";
 const SLOW_HINT_MS = 6000;
 const GIVE_UP_MS = 30000;
 
+/**
+ * Minimum time on screen.
+ *
+ * Locally the health check answers in ~20ms, and a loader that appears and
+ * vanishes inside a single frame reads as a flicker or a rendering glitch —
+ * worse than no loader at all. Holding for two seconds gives the counter time
+ * to be legible and the exit time to feel deliberate.
+ *
+ * It only ever *adds* time when the backend is fast. On a slow one the health
+ * check is already the long pole and this floor costs nothing.
+ */
+const MIN_DISPLAY_MS = 2000;
+
 function healthUrl(): string {
   // API_BASE ends in /api/v1; /health lives at the service root.
   return `${API_BASE.replace(/\/api\/v\d+\/?$/, "")}/health`;
@@ -71,6 +84,7 @@ export function Preloader() {
     frame = requestAnimationFrame(tick);
 
     const slowTimer = window.setTimeout(() => setSlow(true), SLOW_HINT_MS);
+    const timers: number[] = [];
 
     const finish = () => {
       if (settled.current) return;
@@ -81,11 +95,23 @@ export function Preloader() {
       sessionStorage.setItem(SESSION_KEY, "1");
 
       // Brief hold at 100 so the number is legible, then the curtain lifts.
-      window.setTimeout(() => setLeaving(true), 260);
-      window.setTimeout(() => {
-        setActive(false);
-        document.body.style.overflow = "";
-      }, 1160);
+      timers.push(window.setTimeout(() => setLeaving(true), 300));
+      timers.push(
+        window.setTimeout(() => {
+          setActive(false);
+          document.body.style.overflow = "";
+        }, 1200)
+      );
+    };
+
+    /** Waits out the remainder of the minimum display time, if any. */
+    const finishAfterMinimum = () => {
+      const remaining = MIN_DISPLAY_MS - (performance.now() - started);
+      if (remaining > 0) {
+        timers.push(window.setTimeout(finish, remaining));
+      } else {
+        finish();
+      }
     };
 
     // Never hold the page hostage. If the API is unreachable the app itself
@@ -94,14 +120,15 @@ export function Preloader() {
     const giveUp = window.setTimeout(finish, GIVE_UP_MS);
 
     fetch(healthUrl(), { cache: "no-store" })
-      .then(finish)
-      .catch(finish)
+      .then(finishAfterMinimum)
+      .catch(finishAfterMinimum)
       .finally(() => window.clearTimeout(giveUp));
 
     return () => {
       cancelAnimationFrame(frame);
       window.clearTimeout(slowTimer);
       window.clearTimeout(giveUp);
+      timers.forEach(window.clearTimeout);
       document.body.style.overflow = "";
     };
   }, []);

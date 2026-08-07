@@ -276,6 +276,32 @@ def add_lineage(model_id: str, payload: LineageCreate, db: Session = Depends(get
     return lineage
 
 
+@router.get("/models/{model_id}/dataset/info")
+def get_dataset_info(model_id: str, db: Session = Depends(get_db)):
+    """
+    What data, if any, is downloadable for this model — including a short
+    preview so a reviewer can see the shape without committing to a file.
+    """
+    model = _get_model_or_404(db, model_id)
+    from app.api.datasets import dataset_info
+
+    return dataset_info(model.name)
+
+
+@router.get("/models/{model_id}/dataset")
+def get_dataset(model_id: str, limit: int = 1000, db: Session = Depends(get_db)):
+    """
+    A capped CSV sample of the data behind this model.
+
+    Opt-in per model and never the full file — see app/api/datasets.py for why
+    both of those are deliberate rather than incidental.
+    """
+    model = _get_model_or_404(db, model_id)
+    from app.api.datasets import dataset_csv
+
+    return dataset_csv(model.name, limit=limit)
+
+
 @router.post("/models/{model_id}/explain")
 def explain_prediction(model_id: str, applicant: dict, db: Session = Depends(get_db)):
     """
