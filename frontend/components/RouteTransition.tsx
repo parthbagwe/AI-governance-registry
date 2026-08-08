@@ -4,36 +4,43 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { resetScroll } from "@/components/SmoothScroll";
+import { CandlestickAnimation } from "@/components/CandlestickAnimation";
 
 /**
- * Covers the gap between clicking a link and the new page having data.
+ * Page transition: a market chart draws itself while the next page loads.
  *
- * The App Router swaps the route instantly, but the page underneath then fires
- * several requests before it has anything to show. Without something covering
- * that window you get a click, a pause, and then a jump — which reads as the
- * site hanging even when nothing is wrong.
+ * The visual isn't arbitrary. This system monitors FX markets, so the loading
+ * state shows the thing it actually watches — a price series forming. A
+ * spinner would say nothing about what's happening; a chart drawing itself
+ * says "market data is being read", which happens to be true.
  *
- * Two panels sweep across from opposite edges and retract. The retraction is
- * the slower half deliberately: a curtain that snaps open feels like a glitch,
- * one that draws back feels like a transition.
+ * Structure: a full-bleed panel rises from the bottom, the chart builds inside
+ * it, then the panel keeps rising and exits through the top. It never
+ * retracts. A cover that reverses out the way it came reads as undo; one that
+ * travels through reads as a transition.
  *
- * It also resets scroll. Lenis owns the scroll position, so without an
- * explicit reset you arrive at a new page already scrolled to wherever you
- * were on the last one.
+ * It also solves a real problem. The App Router swaps routes instantly, but
+ * the page underneath then fires several requests before it can render. With
+ * nothing over that gap you get a click, a pause, and a jump — which reads as
+ * the site hanging even when nothing is wrong.
  */
 
-const COVER_MS = 380;
-const HOLD_MS = 140;
-const REVEAL_MS = 620;
+const COVER_MS = 420;
+const HOLD_MS = 1100; // long enough for the chart to finish drawing
+const REVEAL_MS = 520;
+const TOTAL = COVER_MS + HOLD_MS + REVEAL_MS;
 
 export function RouteTransition() {
   const pathname = usePathname();
   const previous = useRef<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "covering" | "revealing">("idle");
+  // Forces a fresh chart on every transition — a fixed series would start to
+  // look like a static image by the third navigation.
+  const [seed, setSeed] = useState(0);
 
   useEffect(() => {
-    // Skip the very first render — the preloader already owns that moment, and
-    // stacking two entrance animations looks like a stutter.
+    // Skip the first render; the preloader owns that moment and stacking two
+    // entrance animations reads as a stutter.
     if (previous.current === null) {
       previous.current = pathname;
       return;
@@ -49,59 +56,59 @@ export function RouteTransition() {
       return;
     }
 
+    setSeed(Math.floor(Math.random() * 1_000_000));
     setPhase("covering");
-    const timers: number[] = [];
 
-    timers.push(
-      window.setTimeout(() => {
-        // Scroll is reset at full cover, so the jump is never visible.
-        resetScroll();
-        setPhase("revealing");
-      }, COVER_MS + HOLD_MS)
-    );
+    const toReveal = window.setTimeout(() => {
+      // Scroll resets while fully covered, so the jump is never visible.
+      resetScroll();
+      setPhase("revealing");
+    }, COVER_MS + HOLD_MS);
 
-    timers.push(
-      window.setTimeout(() => setPhase("idle"), COVER_MS + HOLD_MS + REVEAL_MS)
-    );
+    const toIdle = window.setTimeout(() => setPhase("idle"), TOTAL);
 
-    return () => timers.forEach(window.clearTimeout);
+    return () => {
+      window.clearTimeout(toReveal);
+      window.clearTimeout(toIdle);
+    };
   }, [pathname]);
 
   if (phase === "idle") return null;
 
-  const covered = phase === "covering";
+  const covering = phase === "covering";
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[90]" aria-hidden="true">
-      {/* Top panel sweeps down, bottom panel sweeps up — they meet in the
-          middle, which hides the seam better than a single full-height wipe. */}
+    <div
+      className="pointer-events-none fixed inset-0 z-[90] overflow-hidden"
+      aria-hidden="true"
+    >
       <div
-        className="absolute inset-x-0 top-0 h-1/2 bg-ink-950"
+        className="absolute inset-0 flex flex-col items-center justify-center bg-ink-950 px-6"
         style={{
-          transform: covered ? "translateY(0)" : "translateY(-101%)",
-          transition: `transform ${covered ? COVER_MS : REVEAL_MS}ms cubic-bezier(0.76, 0, 0.24, 1)`,
+          animationName: covering ? "panel-rise-in" : "panel-rise-out",
+          animationDuration: `${covering ? COVER_MS : REVEAL_MS}ms`,
+          animationTimingFunction: "cubic-bezier(0.76, 0, 0.24, 1)",
+          animationFillMode: "both",
+          willChange: "transform",
         }}
-      />
-      <div
-        className="absolute inset-x-0 bottom-0 h-1/2 bg-ink-950"
-        style={{
-          transform: covered ? "translateY(0)" : "translateY(101%)",
-          transition: `transform ${covered ? COVER_MS : REVEAL_MS}ms cubic-bezier(0.76, 0, 0.24, 1)`,
-          // A beat behind the top panel, so the two edges don't move as one
-          // slab. Small asymmetries are most of what makes motion feel crafted.
-          transitionDelay: covered ? "40ms" : "0ms",
-        }}
-      />
+      >
+        <div className="w-full max-w-3xl">
+          {covering && (
+            <CandlestickAnimation
+              seed={seed}
+              className="opacity-90"
+              candleMs={250}
+              staggerMs={32}
+            />
+          )}
+        </div>
 
-      {/* A hairline that races across the seam while the panels are closed. */}
-      <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center overflow-hidden">
-        <div
-          className="h-px bg-sky-400/70"
-          style={{
-            width: covered ? "min(340px, 60vw)" : "0px",
-            transition: `width ${covered ? COVER_MS + HOLD_MS : 180}ms cubic-bezier(0.16, 1, 0.3, 1)`,
-          }}
-        />
+        <p
+          className="fade-in mt-6 font-mono text-[11px] uppercase tracking-[0.22em] text-slate-600"
+          style={{ animationDelay: "160ms" }}
+        >
+          Reading the register
+        </p>
       </div>
     </div>
   );

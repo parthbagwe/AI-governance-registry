@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 
 import { API_BASE } from "@/lib/api";
+import { CandlestickAnimation } from "@/components/CandlestickAnimation";
 
 /**
  * Full-screen preloader, shown once per session.
@@ -137,13 +138,13 @@ export function Preloader() {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col justify-between bg-ink-950 px-6 py-10 transition-transform duration-[900ms] sm:px-12 ${
+      className={`fixed inset-0 z-[100] flex flex-col justify-between overflow-hidden bg-ink-950 px-6 py-10 transition-transform duration-[900ms] sm:px-12 ${
         leaving ? "-translate-y-full" : "translate-y-0"
       }`}
       style={{ transitionTimingFunction: "cubic-bezier(0.76, 0, 0.24, 1)" }}
       aria-hidden="true"
     >
-      <div className="fade-in flex items-center gap-3">
+      <div className="fade-in relative flex items-center gap-3">
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-sky-500/15 ring-1 ring-inset ring-sky-400/25">
           <ShieldCheck className="h-5 w-5 text-sky-300" />
         </span>
@@ -152,7 +153,15 @@ export function Preloader() {
         </span>
       </div>
 
-      <div className="flex flex-col items-start gap-6">
+      {/* The same chart as the page transition, so the two read as one system
+          rather than two unrelated loading states. */}
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-[58%] px-6 opacity-70 sm:px-12">
+        <div className="mx-auto w-full max-w-3xl">
+          <CandlestickAnimation candleMs={260} staggerMs={36} />
+        </div>
+      </div>
+
+      <div className="relative flex flex-col items-start gap-6">
         <p
           className="fade-in max-w-lg text-[clamp(1.4rem,3.6vw,2.2rem)] font-semibold leading-[1.15] tracking-[-0.02em] text-white"
           style={{ animationDelay: "0.2s" }}

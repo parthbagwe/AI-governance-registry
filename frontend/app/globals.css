@@ -207,6 +207,39 @@ html.lenis body {
   to   { transform: scaleX(1); }
 }
 
+/* Page-transition panel.
+   Keyframes rather than transitions on purpose: a keyframe declares its own
+   starting position, so the panel begins off-screen on its first painted
+   frame. Driving this with transitions would need it mounted in the start
+   position and flipped a frame later, which React re-renders straight over —
+   the screen just goes dark with nothing to animate from.
+
+   In and out travel the same direction. A cover that reverses out the way it
+   came reads as undo; one that passes through reads as a transition. */
+@keyframes panel-rise-in {
+  from { transform: translateY(101%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes panel-rise-out {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-101%); }
+}
+
+/* A candle resolving into place. Scale runs on Y only — scaling both axes
+   makes the bar appear to fly toward the viewer, which is wrong for something
+   that should read as a value settling. */
+@keyframes candle-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.05);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
 /* A light travelling across skeleton placeholders. Pulsing opacity alone reads
    as "broken and blinking"; a directional sweep reads as "working on it",
    because the movement implies progress even though it measures none. */
