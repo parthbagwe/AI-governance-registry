@@ -4,15 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { resetScroll } from "@/components/SmoothScroll";
-import { CandlestickAnimation } from "@/components/CandlestickAnimation";
+import { LoadingVisual } from "@/components/LoadingVisual";
 
 /**
- * Page transition: a market chart draws itself while the next page loads.
+ * Page transition: a market visual plays while the next page loads.
  *
- * The visual isn't arbitrary. This system monitors FX markets, so the loading
- * state shows the thing it actually watches — a price series forming. A
- * spinner would say nothing about what's happening; a chart drawing itself
- * says "market data is being read", which happens to be true.
+ * The visual isn't arbitrary. This system monitors markets, so the loading
+ * state shows the thing it actually watches — a price series forming, a tape
+ * running, or bull against bear. A spinner would say nothing about what's
+ * happening; these say "market data is being read", which happens to be true.
+ *
+ * One of three is chosen at random each time. A loading screen gets seen
+ * dozens of times in a session, and a fixed animation stops registering after
+ * the third viewing — at which point it's just a delay with decoration on it.
  *
  * Structure: a full-bleed panel rises from the bottom, the chart builds inside
  * it, then the panel keeps rising and exits through the top. It never
@@ -92,23 +96,12 @@ export function RouteTransition() {
           willChange: "transform",
         }}
       >
+        {/* Only rendered while covering — mounting it during the reveal would
+            restart every animation just as the panel is leaving, which shows
+            up as a flicker on the way out. */}
         <div className="w-full max-w-3xl">
-          {covering && (
-            <CandlestickAnimation
-              seed={seed}
-              className="opacity-90"
-              candleMs={250}
-              staggerMs={32}
-            />
-          )}
+          {covering && <LoadingVisual seed={seed} />}
         </div>
-
-        <p
-          className="fade-in mt-6 font-mono text-[11px] uppercase tracking-[0.22em] text-slate-600"
-          style={{ animationDelay: "160ms" }}
-        >
-          Reading the register
-        </p>
       </div>
     </div>
   );

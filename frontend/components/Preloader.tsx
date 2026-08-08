@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 
 import { API_BASE } from "@/lib/api";
-import { CandlestickAnimation } from "@/components/CandlestickAnimation";
+import { LoadingVisual } from "@/components/LoadingVisual";
 
 /**
  * Full-screen preloader, shown once per session.
@@ -153,11 +153,12 @@ export function Preloader() {
         </span>
       </div>
 
-      {/* The same chart as the page transition, so the two read as one system
-          rather than two unrelated loading states. */}
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-[58%] px-6 opacity-70 sm:px-12">
+      {/* Same set of visuals as the page transition, so the two read as one
+          system rather than two unrelated loading states. Caption suppressed —
+          the heading below already carries the words. */}
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-[62%] px-6 opacity-70 sm:px-12">
         <div className="mx-auto w-full max-w-3xl">
-          <CandlestickAnimation candleMs={260} staggerMs={36} />
+          <LoadingVisual showCaption={false} />
         </div>
       </div>
 

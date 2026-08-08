@@ -226,6 +226,43 @@ html.lenis body {
   to   { transform: translateY(-101%); }
 }
 
+/* Ticker tape. Translating by exactly -50% works because the row is rendered
+   twice back to back — at the halfway point the second copy sits precisely
+   where the first started, so the loop has no seam. */
+@keyframes ticker-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+/* Bull and bear entering, meeting, and one pushing through. */
+@keyframes charge-in-left {
+  from { opacity: 0; transform: translateX(-90px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes charge-in-right {
+  from { opacity: 0; transform: translateX(90px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes surge-right {
+  0%   { transform: translateX(0); }
+  35%  { transform: translateX(-8px); }   /* winds up before pushing */
+  100% { transform: translateX(26px); }
+}
+
+@keyframes surge-left {
+  0%   { transform: translateX(0); }
+  35%  { transform: translateX(8px); }
+  100% { transform: translateX(-26px); }
+}
+
+@keyframes clash-flash {
+  0%   { opacity: 0; transform: scale(0.3); }
+  40%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+
 /* A candle resolving into place. Scale runs on Y only — scaling both axes
    makes the bar appear to fly toward the viewer, which is wrong for something
    that should read as a value settling. */
