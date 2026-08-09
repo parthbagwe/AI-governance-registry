@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push while the first is still building makes the first result
+# irrelevant, so cancel it rather than paying for both.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        # requirements.txt plus pytest, deliberately — not requirements-dev.
+        # The tests only exercise the API, workflow and analysis layers, so
+        # running them against the deployed dependency set proves those layers
+        # don't quietly need something the deployed service won't have.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: pytest
+
+  frontend:
+    name: Frontend type-check and build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        # Catches contract drift between the frontend types and the API
+        # schemas — the failure mode where a renamed backend field turns into a
+        # silent `undefined` in the UI rather than an error anyone sees.
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          # Never contacted during a build; every fetch in this app is
+          # client-side. Set only so the variable is defined.
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1

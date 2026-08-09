@@ -354,6 +354,50 @@ built yet.
 
 ---
 
+## Tests
+
+```powershell
+pytest
+```
+
+Runs on every push via GitHub Actions, alongside a frontend type-check and
+build.
+
+The suite is split by what it's actually proving:
+
+| File | What it establishes |
+|---|---|
+| `test_workflow.py` | The rules are correct, in isolation — no database, no HTTP. An auditor asking "prove a model can't skip review" gets an answer that doesn't depend on the web layer being right. |
+| `test_api_governance.py` | The rules are *reachable*. Correct logic behind a route that never calls it is the failure mode worth guarding against. |
+| `test_assessment.py` | The RBI tiering logic, especially the anti-dilution rule. |
+| `test_diagnostics.py` | The statistics, against cases where the right answer is known in advance. |
+
+Three of these exist because something actually broke:
+
+- **Duplicate `(name, version)`.** Re-running a registration script silently
+  created a second model with the same identity and a different ID. A registry
+  holding two copies of v1.0.0 can't say which one is live, and each collects
+  its own approval history.
+- **`production → review` was missing.** The state machine originally allowed
+  only `production → deprecated`, so an automated monitor's sole option against
+  a degrading live model would have been to retire it permanently.
+- **Anti-dilution.** Averaging materiality against complexity feels natural and
+  is exactly what Para 20 rules out — it lets a simple model with enormous
+  consequences be scored down on the strength of being simple.
+
+Statistical code gets tested hardest, because a plausible-looking number never
+announces itself as wrong. PSI is checked against identical distributions
+(must be ~0), a shifted mean (must clear the threshold), and — the one that
+matters — *same mean, wider spread*, which is exactly what FX did in March 2020
+and what a check watching only averages would have missed.
+
+Every test uses a throwaway SQLite database created and dropped per test.
+Governance state is cumulative, and tests that pass only in a particular order
+are worse than no tests: they teach you to trust a green run that isn't
+checking what you think it is.
+
+---
+
 ## Deployment
 
 The backend goes to Render and the frontend to Vercel, because they need
