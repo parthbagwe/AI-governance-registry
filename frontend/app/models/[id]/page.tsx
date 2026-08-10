@@ -67,6 +67,19 @@ export default function ModelDetailPage() {
     load();
   }, [load]);
 
+  // Set client-side, because the layout can't know the model name without
+  // making every model page depend on the API being reachable at render time.
+  // Restored on unmount so a stale model name doesn't linger in the tab after
+  // navigating away.
+  useEffect(() => {
+    if (!model) return;
+    const previous = document.title;
+    document.title = `${model.name} ${model.version} · AI Model Governance Registry`;
+    return () => {
+      document.title = previous;
+    };
+  }, [model]);
+
   // A stage change rewrites the audit trail, so refetch rather than patching
   // local state — the trail is the record, and it should never be guessed at.
   const handleChanged = useCallback(

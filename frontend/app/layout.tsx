@@ -6,10 +6,52 @@ import { Preloader } from "@/components/Preloader";
 import { RouteTransition } from "@/components/RouteTransition";
 import "./globals.css";
 
+// Falls back to localhost so a fresh clone builds without configuration. Set
+// NEXT_PUBLIC_SITE_URL in Vercel — without an absolute base, Open Graph images
+// resolve to relative paths that no social platform can fetch, and the link
+// preview silently comes back blank.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+const DESCRIPTION =
+  "A working model risk management layer for banking AI: risk-tiered approval gates, " +
+  "an emergency kill switch, live drift monitoring on real market data, and an " +
+  "append-only audit trail. Built against the RBI's 2026 draft Model Risk " +
+  "Management guidance.";
+
 export const metadata: Metadata = {
-  title: "AI Model Governance Registry",
-  description:
-    "Risk-tiered approval, drift and fairness monitoring, and a full audit trail for a bank's AI model portfolio — aligned to RBI's 2026 draft Model Risk Management guidance.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    // Pages set only their own name; the suffix is appended automatically, so
+    // a browser tab reads "Assess a model · AI Model Governance Registry"
+    // rather than every tab looking identical.
+    default: "AI Model Governance Registry",
+    template: "%s · AI Model Governance Registry",
+  },
+  description: DESCRIPTION,
+  applicationName: "AI Model Governance Registry",
+  authors: [{ name: "Parth Bagwe" }],
+  keywords: [
+    "model risk management",
+    "AI governance",
+    "RBI",
+    "banking AI",
+    "drift detection",
+    "model registry",
+    "MLOps",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "AI Model Governance Registry",
+    title: "AI Model Governance Registry",
+    description: DESCRIPTION,
+    url: SITE_URL,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Model Governance Registry",
+    description: DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
