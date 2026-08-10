@@ -23,10 +23,14 @@ export const metadata: Metadata = {
   },
 };
 
+// Wrapped in a fragment rather than returning `children` bare. Both are
+// legal, but a layout returning a raw ReactNode instead of a JSX element has
+// been a source of client-manifest errors in the App Router, and the fragment
+// costs nothing.
 export default function AssessLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <>{children}</>;
 }

@@ -19,10 +19,12 @@ export const metadata: Metadata = {
     "and full audit trail for a registered model.",
 };
 
+// Wrapped in a fragment rather than returning `children` bare — see the note
+// in app/assess/layout.tsx.
 export default function ModelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <>{children}</>;
 }
