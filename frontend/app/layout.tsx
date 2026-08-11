@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Preloader } from "@/components/Preloader";
 import { RouteTransition } from "@/components/RouteTransition";
@@ -69,8 +69,8 @@ export default function RootLayout({
         <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
             <Link href="/" className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-sky-500/15 ring-1 ring-inset ring-sky-400/25">
-                <ShieldCheck className="h-5 w-5 text-sky-300" />
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-sky-500/12 text-sky-300 ring-1 ring-inset ring-sky-400/25">
+                <Logo size={20} />
               </span>
               <span className="leading-tight">
                 <span className="block text-sm font-semibold text-white">
@@ -102,9 +102,34 @@ export default function RootLayout({
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-5 pb-24 pt-8 sm:px-8">
+        <main className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8">
           {children}
         </main>
+
+        <footer className="mx-auto max-w-7xl px-5 pb-12 sm:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-6">
+            <p className="text-[11px] text-slate-600">
+              A portfolio project on model risk management for banking AI. Not a
+              commercial service.
+            </p>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/privacy"
+                className="text-[11px] text-slate-500 transition hover:text-slate-300"
+              >
+                Data handling
+              </Link>
+              <a
+                href="https://github.com/parthbagwe/AI-governance-registry"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-slate-500 transition hover:text-slate-300"
+              >
+                Source
+              </a>
+            </div>
+          </div>
+        </footer>
       </body>
     </html>
   );

@@ -104,6 +104,7 @@ export default function AssessPage() {
           stagger={14}
         />
 
+
         <div className="rule mt-8" style={{ animationDelay: "0.5s" }} />
       </section>
 
@@ -116,9 +117,9 @@ export default function AssessPage() {
           <p>
             <b className="text-amber-200">This does not predict failure.</b> There
             is no dataset of models that later broke, so any percentage this
-            produced would be invention with a decimal point on it — and a
-            black-box risk score inside a tool built to argue against black boxes
-            would be self-refuting.
+            produced would be invention with a decimal point on it. A black-box
+            risk score inside a tool built to argue against black boxes would be
+            self-refuting.
           </p>
           <p>
             What it does: applies published regulatory principles as explicit

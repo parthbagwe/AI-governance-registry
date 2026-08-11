@@ -155,18 +155,19 @@ export default function RegistryPage() {
         </summary>
         <div className="mt-3 space-y-2.5 text-sm leading-relaxed text-slate-400">
           <p>
-            Banks now run dozens of AI models — credit scoring, fraud
-            detection, chatbots. This registry is the layer above them: it
-            records what exists, who signed it off, and whether it is still
-            behaving the way it did when it was approved.
+            Banks now run dozens of AI models for credit scoring, fraud
+            detection and customer service. This registry is the layer above
+            them: it records what exists, who signed it off, and whether it is
+            still behaving the way it did when it was approved.
           </p>
           <p>
-            A model moves through four stages — <b>Testing</b> →{" "}
-            <b>Under Review</b> → <b>Live</b> → <b>Retired</b>. It cannot skip
-            ahead, and it cannot go live until it scores well enough on five
-            dimensions. The higher the risk it carries, the higher that bar
-            gets: a credit model that moves customers&apos; money is held to a
-            stricter standard than an internal FAQ bot.
+            A model moves through four stages: <b>Testing</b>, then{" "}
+            <b>Under Review</b>, then <b>Live</b>, and eventually{" "}
+            <b>Retired</b>. It cannot skip ahead, and it cannot go live until
+            it scores well enough on five dimensions. The higher the risk it
+            carries, the higher that bar gets. A credit model that moves
+            customers&apos; money is held to a stricter standard than an
+            internal FAQ bot.
           </p>
           <p>
             Every one of those rules is enforced in the backend, not in this

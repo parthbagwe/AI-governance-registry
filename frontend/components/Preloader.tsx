@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck } from "lucide-react";
-
+import { Logo } from "@/components/Logo";
 import { API_BASE } from "@/lib/api";
 import { LoadingVisual } from "@/components/LoadingVisual";
 
@@ -145,8 +144,8 @@ export function Preloader() {
       aria-hidden="true"
     >
       <div className="fade-in relative flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-lg bg-sky-500/15 ring-1 ring-inset ring-sky-400/25">
-          <ShieldCheck className="h-5 w-5 text-sky-300" />
+        <span className="grid h-9 w-9 place-items-center rounded-lg bg-sky-500/12 text-sky-300 ring-1 ring-inset ring-sky-400/25">
+          <Logo size={20} />
         </span>
         <span className="text-sm font-medium text-slate-300">
           AI Model Governance Registry

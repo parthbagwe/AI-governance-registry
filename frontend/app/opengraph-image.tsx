@@ -58,20 +58,33 @@ export default function Image() {
       >
         {/* Masthead */}
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          {/* The mark, rebuilt from divs. Satori can't rasterise an emoji
+              without a font that carries it, and an emoji standing in for a
+              logo is one of the more obvious signs nobody drew anything. */}
           <div
             style={{
               display: "flex",
               width: 46,
               height: 46,
               borderRadius: 12,
-              background: "rgba(56,189,248,0.16)",
+              background: "rgba(56,189,248,0.14)",
               border: "1px solid rgba(56,189,248,0.3)",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 24,
             }}
           >
-            🛡
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 3,
+                alignItems: "flex-start",
+              }}
+            >
+              <div style={{ display: "flex", width: 11, height: 4, borderRadius: 1.5, background: "rgba(56,189,248,0.55)" }} />
+              <div style={{ display: "flex", width: 17, height: 4, borderRadius: 1.5, background: "rgba(56,189,248,0.8)" }} />
+              <div style={{ display: "flex", width: 22, height: 4, borderRadius: 1.5, background: "#38bdf8" }} />
+            </div>
           </div>
           <div
             style={{
@@ -114,6 +127,9 @@ export default function Image() {
             monitoring on real market data, and an audit trail nothing can
             rewrite.
           </div>
+          {/* Note: no em dashes anywhere in this file's copy. They're a
+              legitimate mark, but at the density they tend to appear in
+              generated text they read as a signature. */}
         </div>
 
         {/* Footer: chips on the left, a chart on the right */}

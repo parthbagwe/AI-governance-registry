@@ -7,9 +7,14 @@
 }
 
 body {
+  /* Cyan and slate, no violet.
+     The blue-to-purple gradient has become the default look of generated
+     sites, to the point where it now reads as a signature rather than a
+     choice. Two cool neutrals a few degrees apart give depth without landing
+     in that register. */
   background:
-    radial-gradient(1100px 600px at 12% -8%, rgba(56, 189, 248, 0.10), transparent 60%),
-    radial-gradient(900px 500px at 92% 4%, rgba(129, 140, 248, 0.10), transparent 55%),
+    radial-gradient(1100px 600px at 12% -8%, rgba(56, 189, 248, 0.09), transparent 60%),
+    radial-gradient(900px 500px at 92% 4%, rgba(45, 212, 191, 0.055), transparent 55%),
     #080b14;
   min-height: 100vh;
 }
