@@ -46,13 +46,11 @@ export const metadata: Metadata = {
     title: "AI Model Governance Registry",
     description: DESCRIPTION,
     url: SITE_URL,
-    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "AI Model Governance Registry — Evidence before deployment" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "AI Model Governance Registry",
     description: DESCRIPTION,
-    images: ["/og.png"],
   },
   robots: { index: true, follow: true },
 };
