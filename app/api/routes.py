@@ -2,15 +2,16 @@ import io
 from typing import List
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.registry import MLModel, ModelMetric, ApprovalEvent, DataLineage
+from app.auth import Actor, audit_actor, require_actor, require_human_role
+from app.models.registry import MLModel, ModelMetric, ApprovalEvent, DataLineage, ModelStage
 from app.schemas import (
     ModelCreate, ModelResponse, ScoreUpdate, ApprovalRequest,
     MetricCreate, MetricResponse, ApprovalEventResponse,
-    LineageCreate, LineageResponse, LineageExportRow,
+    LineageCreate, LineageResponse, LineageExportRow, ModelForecastResponse,
 )
 from app.workflow import validate_transition, InvalidTransitionError, GovernanceGateError, kill_switch
 
@@ -160,7 +161,11 @@ def list_models(db: Session = Depends(get_db)):
 
 
 @router.post("/models", response_model=ModelResponse, status_code=201)
-def register_model(payload: ModelCreate, db: Session = Depends(get_db)):
+def register_model(
+    payload: ModelCreate,
+    actor: Actor = Depends(require_actor),
+    db: Session = Depends(get_db),
+):
     """
     Register a new model version. Always starts life in PILOT stage.
 
@@ -170,6 +175,8 @@ def register_model(payload: ModelCreate, db: Session = Depends(get_db)):
     would accumulate its own separate approval history. If a model genuinely
     changed, it needs a new version number — that's what version numbers are.
     """
+    require_human_role(actor, "admin", "model_owner")
+
     existing = (
         db.query(MLModel)
         .filter(MLModel.name == payload.name, MLModel.version == payload.version)
@@ -195,7 +202,7 @@ def register_model(payload: ModelCreate, db: Session = Depends(get_db)):
     # complete audit trail from birth to (eventually) deprecation.
     db.add(ApprovalEvent(
         model_id=model.id, from_stage=None, to_stage=model.stage,
-        approved_by=model.owner, comment="Initial registration",
+        approved_by=audit_actor(actor, model.owner), comment="Initial registration",
     ))
     db.commit()
 
@@ -209,8 +216,14 @@ def get_model(model_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/models/{model_id}/scores", response_model=ModelResponse)
-def update_scores(model_id: str, payload: ScoreUpdate, db: Session = Depends(get_db)):
+def update_scores(
+    model_id: str,
+    payload: ScoreUpdate,
+    actor: Actor = Depends(require_actor),
+    db: Session = Depends(get_db),
+):
     """Update any subset of the five governance-scorecard dimensions."""
+    require_human_role(actor, "admin", "model_owner", "validator")
     model = _get_model_or_404(db, model_id)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(model, field, value)
@@ -220,11 +233,25 @@ def update_scores(model_id: str, payload: ScoreUpdate, db: Session = Depends(get
 
 
 @router.post("/models/{model_id}/approve", response_model=ModelResponse)
-def approve_transition(model_id: str, payload: ApprovalRequest, db: Session = Depends(get_db)):
+def approve_transition(
+    model_id: str,
+    payload: ApprovalRequest,
+    actor: Actor = Depends(require_actor),
+    db: Session = Depends(get_db),
+):
     """
     Move a model to a new lifecycle stage. Enforces the state machine
     (app/workflow.py) — including the governance-score gate for production.
     """
+    if actor.kind == "service":
+        if payload.to_stage != ModelStage.REVIEW:
+            raise HTTPException(
+                status_code=403,
+                detail="Monitoring services may only demote a model to review.",
+            )
+    else:
+        require_human_role(actor, "admin", "model_owner", "validator", "risk_approver")
+
     model = _get_model_or_404(db, model_id)
 
     try:
@@ -236,7 +263,7 @@ def approve_transition(model_id: str, payload: ApprovalRequest, db: Session = De
 
     db.add(ApprovalEvent(
         model_id=model.id, from_stage=model.stage, to_stage=payload.to_stage,
-        approved_by=payload.approved_by, comment=payload.comment,
+        approved_by=audit_actor(actor, payload.approved_by), comment=payload.comment,
     ))
     model.stage = payload.to_stage
     db.commit()
@@ -245,7 +272,13 @@ def approve_transition(model_id: str, payload: ApprovalRequest, db: Session = De
 
 
 @router.post("/models/{model_id}/kill-switch", response_model=ModelResponse)
-def emergency_kill_switch(model_id: str, reason: str, triggered_by: str, db: Session = Depends(get_db)):
+def emergency_kill_switch(
+    model_id: str,
+    reason: str,
+    triggered_by: str | None = None,
+    actor: Actor = Depends(require_actor),
+    db: Session = Depends(get_db),
+):
     """
     Emergency override: immediately deactivates a model regardless of its
     current stage, with NO governance-score check and NO respect for the
@@ -257,6 +290,7 @@ def emergency_kill_switch(model_id: str, reason: str, triggered_by: str, db: Ses
     an emergency stop should never be reachable by the same form a routine
     reviewer fills in; it needs its own explicit, harder-to-hit-by-accident door.
     """
+    require_human_role(actor, "admin", "emergency_operator")
     model = _get_model_or_404(db, model_id)
 
     try:
@@ -266,7 +300,8 @@ def emergency_kill_switch(model_id: str, reason: str, triggered_by: str, db: Ses
 
     db.add(ApprovalEvent(
         model_id=model.id, from_stage=model.stage, to_stage=new_stage,
-        approved_by=triggered_by, comment=f"[EMERGENCY KILL-SWITCH] {reason}",
+        approved_by=audit_actor(actor, triggered_by),
+        comment=f"[EMERGENCY KILL-SWITCH] {reason}",
         is_emergency=True,
     ))
     model.stage = new_stage
@@ -317,6 +352,27 @@ def get_metrics(model_id: str, metric_name: str = None, db: Session = Depends(ge
     return query.order_by(ModelMetric.recorded_at.asc()).all()
 
 
+@router.get("/models/{model_id}/forecast", response_model=ModelForecastResponse)
+def get_model_forecast(
+    model_id: str,
+    horizon_days: int = 30,
+    db: Session = Depends(get_db),
+):
+    """Project recorded metric trajectories and return a regulatory watchlist."""
+    if horizon_days < 7 or horizon_days > 90:
+        raise HTTPException(status_code=422, detail="horizon_days must be between 7 and 90")
+    model = _get_model_or_404(db, model_id)
+    metrics = (
+        db.query(ModelMetric)
+        .filter(ModelMetric.model_id == model_id)
+        .order_by(ModelMetric.recorded_at.asc())
+        .all()
+    )
+    from app.api.forecasting import build_model_forecast
+
+    return build_model_forecast(model, metrics, horizon_days)
+
+
 @router.get("/models/{model_id}/lineage", response_model=List[LineageResponse])
 def get_lineage(model_id: str, db: Session = Depends(get_db)):
     """Which source tables/features fed this model version."""
@@ -325,7 +381,13 @@ def get_lineage(model_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/models/{model_id}/lineage", response_model=LineageResponse, status_code=201)
-def add_lineage(model_id: str, payload: LineageCreate, db: Session = Depends(get_db)):
+def add_lineage(
+    model_id: str,
+    payload: LineageCreate,
+    response: Response,
+    actor: Actor = Depends(require_actor),
+    db: Session = Depends(get_db),
+):
     """
     Record a data source for this model version.
 
@@ -338,6 +400,7 @@ def add_lineage(model_id: str, payload: LineageCreate, db: Session = Depends(get
     Re-posting the same source_table is treated as idempotent rather than an
     error, so registration scripts can safely be re-run.
     """
+    require_human_role(actor, "admin", "model_owner", "validator")
     _get_model_or_404(db, model_id)
 
     existing = (
@@ -349,6 +412,7 @@ def add_lineage(model_id: str, payload: LineageCreate, db: Session = Depends(get
         .first()
     )
     if existing:
+        response.status_code = 200
         return existing
 
     lineage = DataLineage(model_id=model_id, **payload.model_dump())

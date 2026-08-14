@@ -10,11 +10,11 @@ import { LoadingVisual } from "@/components/LoadingVisual";
  * Page transition: a market visual plays while the next page loads.
  *
  * The visual isn't arbitrary. This system monitors markets, so the loading
- * state shows the thing it actually watches — a price series forming, a tape
- * running, or bull against bear. A spinner would say nothing about what's
+ * state shows the thing it actually watches — a price series forming or a
+ * market tape running. A spinner would say nothing about what's
  * happening; these say "market data is being read", which happens to be true.
  *
- * One of three is chosen at random each time. A loading screen gets seen
+ * One of two is chosen at random each time. A loading screen gets seen
  * dozens of times in a session, and a fixed animation stops registering after
  * the third viewing — at which point it's just a delay with decoration on it.
  *

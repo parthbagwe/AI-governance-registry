@@ -160,4 +160,13 @@ export const METRIC_GLOSS: Record<string, string> = {
   baseline_mean_range_bps: "Typical high-to-low travel per minute (bps)",
   new_bars_since_baseline: "Bars that did not exist when the model was trained",
   latest_price: "Most recent observed price",
+  demo_governance_health:
+    "Synthetic 0–1 demo health index used to demonstrate forecasting; not a production KPI",
+  groundedness: "Share of generated answers supported by approved source material",
+  hallucination_rate: "Share of generated answers containing unsupported claims",
+  false_positive_rate: "Share of negative cases incorrectly flagged as positive",
+  false_reject_rate: "Share of valid cases incorrectly rejected",
+  repayment_precision: "Of prioritised collection cases, the share that produced repayment",
+  alert_precision: "Of surveillance alerts, the share confirmed by investigation",
+  success_rate: "Share of attempts completed successfully",
 };

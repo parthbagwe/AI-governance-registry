@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  * A data-handling note rather than a boilerplate privacy policy.
  *
  * Most privacy pages on portfolio projects are copied from a generator and
- * describe cookies the site doesn't set and analytics it doesn't run, which is
+ * describe tracking the site doesn't use and data it doesn't collect, which is
  * worse than having none: it's a page of claims nobody checked. This one
  * describes what the code actually does, which is short, because it does very
  * little.
@@ -73,9 +73,18 @@ export default function PrivacyPage() {
 
       <Section title="Analytics and tracking">
         <p>
-          There are none. No analytics script, no tracking pixel, no cookies,
-          no fingerprinting, no third-party embeds. Nothing on this site
-          observes you.
+          There are no analytics scripts, tracking pixels, fingerprinting, or
+          advertising embeds. Supabase Auth uses session cookies only to keep
+          approved users signed in and to attach a verified identity to actions.
+        </p>
+      </Section>
+
+      <Section title="Accounts and authentication">
+        <p>
+          Account identity and session data are handled by Supabase Auth. The
+          registry API receives a short-lived signed access token and records
+          the verified account identity against governance decisions; passwords
+          are never sent to or stored by this application.
         </p>
       </Section>
 
@@ -97,9 +106,9 @@ export default function PrivacyPage() {
       <Section title="What this is">
         <p>
           A portfolio project demonstrating model risk management practice, not
-          a commercial service. It stores no accounts, has no users, and sends
-          no email. If you would like anything here removed, the whole thing is
-          in one repository and deleting it is a single command.
+          a commercial service. It stores governance records but delegates
+          account credentials and sessions to Supabase Auth. It sends no
+          marketing email and runs no behavioural analytics.
         </p>
       </Section>
     </div>

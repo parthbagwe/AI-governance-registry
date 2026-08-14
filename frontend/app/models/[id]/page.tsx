@@ -13,6 +13,7 @@ import {
   type DataLineage,
   type MLModel,
   type ModelMetric,
+  type ModelForecast,
 } from "@/lib/types";
 import { LiveBadge, RiskBadge, StageBadge } from "@/components/Badges";
 import { ErrorState } from "@/components/States";
@@ -29,6 +30,7 @@ import { ActionPanel } from "@/components/ActionPanel";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { Reveal } from "@/components/Motion";
 import { TextReveal } from "@/components/TextReveal";
+import { TrajectoryForecast } from "@/components/TrajectoryForecast";
 
 export default function ModelDetailPage() {
   const params = useParams<{ id: string }>();
@@ -36,6 +38,7 @@ export default function ModelDetailPage() {
 
   const [model, setModel] = useState<MLModel | null>(null);
   const [metrics, setMetrics] = useState<ModelMetric[]>([]);
+  const [forecast, setForecast] = useState<ModelForecast | null>(null);
   const [history, setHistory] = useState<ApprovalEvent[]>([]);
   const [lineage, setLineage] = useState<DataLineage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -45,16 +48,18 @@ export default function ModelDetailPage() {
     if (!id) return;
     setRefreshing(true);
     try {
-      const [m, mt, h, l] = await Promise.all([
+      const [m, mt, h, l, f] = await Promise.all([
         api.getModel(id),
         api.getMetrics(id),
         api.getHistory(id),
         api.getLineage(id),
+        api.getForecast(id),
       ]);
       setModel(m);
       setMetrics(mt);
       setHistory(h);
       setLineage(l);
+      setForecast(f);
       setError(null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
@@ -172,6 +177,12 @@ export default function ModelDetailPage() {
       <Reveal>
         <MetricChart metrics={metrics} />
       </Reveal>
+
+      {forecast && (
+        <Reveal>
+          <TrajectoryForecast metrics={metrics} outlook={forecast} />
+        </Reveal>
+      )}
 
       <Reveal>
         <MetricsLog

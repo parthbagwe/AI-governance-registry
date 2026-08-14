@@ -4,6 +4,7 @@ import { Logo } from "@/components/Logo";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { Preloader } from "@/components/Preloader";
 import { RouteTransition } from "@/components/RouteTransition";
+import { AuthNav } from "@/components/AuthNav";
 import "./globals.css";
 
 // Falls back to localhost so a fresh clone builds without configuration. Set
@@ -45,11 +46,13 @@ export const metadata: Metadata = {
     title: "AI Model Governance Registry",
     description: DESCRIPTION,
     url: SITE_URL,
+    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "AI Model Governance Registry — Evidence before deployment" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "AI Model Governance Registry",
     description: DESCRIPTION,
+    images: ["/og.png"],
   },
   robots: { index: true, follow: true },
 };
@@ -95,9 +98,16 @@ export default function RootLayout({
               >
                 Assess a model
               </Link>
+              <Link
+                href="/methodology"
+                className="hidden rounded-lg px-3 py-1.5 text-xs text-slate-400 transition hover:bg-white/5 hover:text-slate-200 sm:block"
+              >
+                Data & methods
+              </Link>
               <span className="ml-1 hidden rounded-full border border-white/10 px-3 py-1.5 text-[11px] text-slate-500 lg:block">
                 RBI draft MRM guidance, 2026
               </span>
+              <AuthNav />
             </nav>
           </div>
         </header>
@@ -118,6 +128,12 @@ export default function RootLayout({
                 className="text-[11px] text-slate-500 transition hover:text-slate-300"
               >
                 Data handling
+              </Link>
+              <Link
+                href="/methodology"
+                className="text-[11px] text-slate-500 transition hover:text-slate-300"
+              >
+                Data & methodology
               </Link>
               <a
                 href="https://github.com/parthbagwe/AI-governance-registry"

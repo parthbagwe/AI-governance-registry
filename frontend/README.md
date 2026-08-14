@@ -42,14 +42,20 @@ copy .env.local.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000.
+Set `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`, then open
+http://localhost:3000. Unauthenticated visitors are redirected to `/login`.
+Supabase email signup is available at `/signup`. In Supabase Authentication →
+URL Configuration, add `http://localhost:3000/auth/callback` as an allowed
+redirect URL so email confirmations can establish a session.
 
 ## Deploying to Vercel
 
 1. Push this repo to GitHub.
 2. In Vercel, import the repo and set **Root Directory** to `frontend`.
-3. Add an environment variable: `NEXT_PUBLIC_API_URL` = your deployed API's
-   base URL, ending in `/api/v1`.
+3. Add `NEXT_PUBLIC_API_URL` (your deployed API's base URL ending in
+   `/api/v1`), `NEXT_PUBLIC_SUPABASE_URL`, and
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 4. Deploy.
 
 The backend must be reachable over HTTPS and must allow your Vercel origin in
@@ -63,6 +69,7 @@ frontend/
 ├── app/
 │   ├── layout.tsx            shell, header, global styles
 │   ├── page.tsx              portfolio overview: stats, filters, model table
+│   ├── signup/page.tsx       Supabase email/password self-registration
 │   ├── models/[id]/page.tsx  model detail, composes the panels below
 │   └── not-found.tsx
 ├── components/
@@ -70,6 +77,7 @@ frontend/
 │   ├── PortfolioStats.tsx    the four headline numbers
 │   ├── Scorecard.tsx         five-dimension scorecard + pass/fail against tier
 │   ├── MetricChart.tsx       time-series of logged metrics (recharts)
+│   ├── TrajectoryForecast.tsx projected metrics + regulatory source watchlist
 │   ├── AuditTrail.tsx        append-only stage history, emergency events marked
 │   ├── LineagePanel.tsx      source tables and features
 │   ├── ActionPanel.tsx       stage transitions + emergency kill switch
@@ -88,19 +96,20 @@ frontend/
 | GET | `/models` | portfolio page |
 | GET | `/models/{id}` | detail page |
 | GET | `/models/{id}/metrics` | metric chart |
+| GET | `/models/{id}/forecast` | trajectory forecast and regulatory outlook |
 | GET | `/models/{id}/history` | audit trail |
 | GET | `/models/{id}/lineage` | lineage panel |
 | POST | `/models/{id}/approve` | action panel |
 | POST | `/models/{id}/kill-switch` | emergency stop |
 | POST | `/models/{id}/explain` | explain panel |
 
-Note: `kill-switch` takes `reason` and `triggered_by` as **query parameters**,
-not a JSON body — they're declared as plain function arguments in `routes.py`,
-so FastAPI reads them from the query string. Sending a body there returns 422.
+Note: `kill-switch` takes `reason` as a **query parameter**. The authenticated
+Supabase user is recorded as the actor; the browser cannot supply or spoof a
+`triggered_by` identity.
 
 ## Demo flow
 
-1. Land on the portfolio — nine models, four headline numbers, filter by risk.
+1. Land on the portfolio — twenty-six models, four headline numbers, filter by risk.
 2. Open **fraud-flagger** (high risk, score ~6.25). Pick "Live", submit. The UI
    warns you first, then the backend returns **403** with its own explanation.
 3. Open a model in Testing. Notice "Live" is struck through — stages can't be

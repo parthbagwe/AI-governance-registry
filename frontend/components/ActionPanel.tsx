@@ -34,7 +34,6 @@ export function ActionPanel({
   const legalStages = ALLOWED_TRANSITIONS[model.stage];
 
   const [target, setTarget] = useState<ModelStage | "">(legalStages[0] ?? "");
-  const [actor, setActor] = useState("");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
@@ -51,13 +50,12 @@ export function ActionPanel({
     (model.governance_score === null || model.governance_score < required);
 
   async function submit() {
-    if (!target || !actor.trim()) return;
+    if (!target) return;
     setBusy(true);
     setOutcome(null);
     try {
       const updated = await api.approve(model.id, {
         to_stage: target,
-        approved_by: actor.trim(),
         comment: comment.trim() || undefined,
       });
       onChanged(updated);
@@ -95,7 +93,7 @@ export function ActionPanel({
       <h2 className="text-sm font-semibold text-white">Governance actions</h2>
       <p className="mt-1 text-xs text-slate-500">
         Move this model to a different stage. Every action is recorded against
-        your name in the audit trail.
+        your verified Supabase identity in the audit trail.
       </p>
 
       <div className="mt-5 space-y-4">
@@ -137,25 +135,14 @@ export function ActionPanel({
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label mb-2 block">Your name or team</label>
-            <input
-              value={actor}
-              onChange={(e) => setActor(e.target.value)}
-              placeholder="e.g. risk-committee"
-              className="field"
-            />
-          </div>
-          <div>
-            <label className="label mb-2 block">Reason (optional)</label>
-            <input
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Why are you making this change?"
-              className="field"
-            />
-          </div>
+        <div>
+          <label className="label mb-2 block">Reason (optional)</label>
+          <input
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Why are you making this change?"
+            className="field"
+          />
         </div>
 
         {willLikelyFail && (
@@ -173,7 +160,7 @@ export function ActionPanel({
 
         <button
           onClick={submit}
-          disabled={busy || !target || !actor.trim()}
+          disabled={busy || !target}
           className="btn-primary w-full sm:w-auto"
         >
           {busy ? "Submitting…" : "Submit for approval"}
@@ -233,7 +220,6 @@ function KillSwitch({
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [actor, setActor] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,7 +228,7 @@ function KillSwitch({
     setBusy(true);
     setError(null);
     try {
-      const updated = await api.killSwitch(model.id, reason.trim(), actor.trim());
+      const updated = await api.killSwitch(model.id, reason.trim());
       onChanged(updated);
       setOpen(false);
       setReason("");
@@ -281,12 +267,6 @@ function KillSwitch({
 
           <div className="mt-4 space-y-3">
             <input
-              value={actor}
-              onChange={(e) => setActor(e.target.value)}
-              placeholder="Who is triggering this?"
-              className="field"
-            />
-            <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Documented reason (required — this can't be silent)"
@@ -312,7 +292,7 @@ function KillSwitch({
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={fire}
-                disabled={busy || !confirmed || !reason.trim() || !actor.trim()}
+                disabled={busy || !confirmed || !reason.trim()}
                 className="btn-danger"
               >
                 {busy ? "Stopping…" : "Trigger emergency stop"}

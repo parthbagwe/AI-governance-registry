@@ -24,11 +24,16 @@ function csvField(value: unknown): string {
   return s;
 }
 
-export function toCsv(rows: Record<string, unknown>[], columns?: string[]): string {
+export function toCsv(rows: object[], columns?: string[]): string {
   if (rows.length === 0) return "";
   const cols = columns ?? Object.keys(rows[0]);
   const header = cols.map(csvField).join(",");
-  const body = rows.map((r) => cols.map((c) => csvField(r[c])).join(",")).join("\r\n");
+  const body = rows
+    .map((row) => {
+      const record = row as Record<string, unknown>;
+      return cols.map((column) => csvField(record[column])).join(",");
+    })
+    .join("\r\n");
   // CRLF and a UTF-8 BOM: without the BOM, Excel on Windows renders anything
   // non-ASCII as mojibake, and the notes fields contain em-dashes.
   return `﻿${header}\r\n${body}`;

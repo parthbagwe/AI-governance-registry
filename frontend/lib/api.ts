@@ -16,7 +16,9 @@ import type {
   LineageExportRow,
   ModelStage,
   ExplainResult,
+  ModelForecast,
 } from "./types";
+import { createClient } from "./supabase/client";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -31,13 +33,30 @@ export class ApiError extends Error {
   }
 }
 
+/** Adds the current Supabase access token to any request sent to FastAPI. */
+export async function authenticatedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const {
+    data: { session },
+  } = await createClient().auth.getSession();
+  const headers = new Headers(init?.headers);
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+  return fetch(input, { ...init, headers });
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    const headers = new Headers(init?.headers);
+    headers.set("Content-Type", "application/json");
+    res = await authenticatedFetch(`${API_BASE}${path}`, {
       ...init,
       cache: "no-store",
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      headers,
     });
   } catch {
     throw new ApiError(
@@ -54,6 +73,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       else if (Array.isArray(body?.detail)) detail = JSON.stringify(body.detail);
     } catch {
       /* response had no JSON body — keep the generic message */
+    }
+    if (res.status === 401 && typeof window !== "undefined") {
+      const next = `${window.location.pathname}${window.location.search}`;
+      window.location.assign(`/login?next=${encodeURIComponent(next)}`);
     }
     throw new ApiError(res.status, detail);
   }
@@ -74,6 +97,9 @@ export const api = {
       }`
     ),
 
+  getForecast: (id: string, horizonDays = 30) =>
+    request<ModelForecast>(`/models/${id}/forecast?horizon_days=${horizonDays}`),
+
   getHistory: (id: string) => request<ApprovalEvent[]>(`/models/${id}/history`),
 
   getLineage: (id: string) => request<DataLineage[]>(`/models/${id}/lineage`),
@@ -83,23 +109,17 @@ export const api = {
 
   approve: (
     id: string,
-    body: { to_stage: ModelStage; approved_by: string; comment?: string }
+    body: { to_stage: ModelStage; comment?: string }
   ) =>
     request<MLModel>(`/models/${id}/approve`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
-  /**
-   * NOTE: the kill-switch route declares `reason` and `triggered_by` as bare
-   * function arguments in routes.py, which FastAPI interprets as *query
-   * parameters*, not a JSON body. Sending them as a body returns a 422.
-   */
-  killSwitch: (id: string, reason: string, triggeredBy: string) =>
+  /** The actor is derived by FastAPI from the verified Supabase token. */
+  killSwitch: (id: string, reason: string) =>
     request<MLModel>(
-      `/models/${id}/kill-switch?reason=${encodeURIComponent(
-        reason
-      )}&triggered_by=${encodeURIComponent(triggeredBy)}`,
+      `/models/${id}/kill-switch?reason=${encodeURIComponent(reason)}`,
       { method: "POST" }
     ),
 

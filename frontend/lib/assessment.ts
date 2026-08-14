@@ -1,4 +1,4 @@
-import { API_BASE, ApiError } from "@/lib/api";
+import { API_BASE, ApiError, authenticatedFetch } from "@/lib/api";
 
 export type Severity = "blocker" | "high" | "medium" | "info";
 
@@ -102,7 +102,7 @@ export const DEFAULT_PROPOSAL: Proposal = {
 };
 
 export async function runAssessment(p: Proposal): Promise<AssessmentResult> {
-  const res = await fetch(`${API_BASE}/assessment`, {
+  const res = await authenticatedFetch(`${API_BASE}/assessment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(p),
@@ -120,7 +120,7 @@ export async function runDatasetDiagnostics(file: File): Promise<DatasetResult> 
   form.append("file", file);
   // No Content-Type header — the browser has to set the multipart boundary
   // itself, and setting it manually produces a request the server can't parse.
-  const res = await fetch(`${API_BASE}/assessment/dataset`, {
+  const res = await authenticatedFetch(`${API_BASE}/assessment/dataset`, {
     method: "POST",
     body: form,
     cache: "no-store",

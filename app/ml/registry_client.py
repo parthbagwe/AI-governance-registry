@@ -19,7 +19,13 @@ the governance gate rests on: no actor gets a private door.
 import os
 from typing import Any
 
+from dotenv import load_dotenv
+
+load_dotenv()
+load_dotenv(".env.auth")
+
 REGISTRY_API_URL = os.getenv("REGISTRY_API_URL", "").rstrip("/")
+REGISTRY_API_KEY = os.getenv("REGISTRY_API_KEY", "")
 
 # Where the versioned routes live, relative to the service root.
 API_PREFIX = "/api/v1"
@@ -44,14 +50,28 @@ class _RemoteClient:
     def _url(self, path: str) -> str:
         return f"{self.base_url}{path}"
 
+    @staticmethod
+    def _with_auth(kwargs: dict[str, Any]) -> dict[str, Any]:
+        if not REGISTRY_API_KEY:
+            return kwargs
+        headers = dict(kwargs.pop("headers", {}))
+        headers["X-API-Key"] = REGISTRY_API_KEY
+        return {**kwargs, "headers": headers}
+
     def get(self, path: str, **kwargs: Any):
-        return self._requests.get(self._url(path), timeout=30, **kwargs)
+        return self._requests.get(
+            self._url(path), timeout=30, **self._with_auth(kwargs)
+        )
 
     def post(self, path: str, **kwargs: Any):
-        return self._requests.post(self._url(path), timeout=60, **kwargs)
+        return self._requests.post(
+            self._url(path), timeout=60, **self._with_auth(kwargs)
+        )
 
     def patch(self, path: str, **kwargs: Any):
-        return self._requests.patch(self._url(path), timeout=30, **kwargs)
+        return self._requests.patch(
+            self._url(path), timeout=30, **self._with_auth(kwargs)
+        )
 
 
 def get_client():
@@ -65,7 +85,10 @@ def get_client():
     from fastapi.testclient import TestClient
     from app.main import app
 
-    return TestClient(app)
+    client = TestClient(app)
+    if REGISTRY_API_KEY:
+        client.headers.update({"X-API-Key": REGISTRY_API_KEY})
+    return client
 
 
 def describe_target() -> str:

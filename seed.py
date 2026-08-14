@@ -1,5 +1,5 @@
 """
-Creates all tables and seeds the registry with 3 realistic model entries:
+Creates all tables and seeds the registry with a realistic model portfolio.
 
 1. sme-credit-scorer   (traditional_ml) -> already in production
 2. fraud-flagger       (traditional_ml) -> in review, borderline governance score
@@ -15,6 +15,7 @@ from app.database import Base, engine, SessionLocal
 from app.models.registry import (
     MLModel, ModelMetric, ApprovalEvent, DataLineage, ModelType, ModelStage, RiskTier
 )
+from app.sample_portfolio import expand_sample_portfolio
 
 # Fresh start every time we seed, so this script is idempotent for demos
 Base.metadata.drop_all(bind=engine)
@@ -245,6 +246,7 @@ db.add(ApprovalEvent(
 ))
 
 db.commit()
+expand_sample_portfolio(db)
 db.close()
 
 print("✅ Database seeded: governance.db")
@@ -254,3 +256,4 @@ print("   - rm-copilot-intents        (pilot, LOW risk, just registered)")
 print("   - enterprise-knowledge-bot  (production, LOW risk)")
 print("   - next-best-offer-recommender (review, MEDIUM risk)")
 print("   - aml-transaction-monitor   (pilot, HIGH risk, early stage)")
+print("   - plus sixteen extended banking, payments, KYC, GenAI, security, and market models")

@@ -38,3 +38,11 @@ services:
       # else — any page on the internet could POST approvals to your registry.
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: AUTH_ADMIN_EMAILS
+        sync: false
+      - key: MONITOR_API_KEY
+        generateValue: true

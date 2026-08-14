@@ -1,10 +1,11 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine, DATABASE_URL
 from app.api.routes import router
+from app.auth import require_actor
 
 # Ensure tables exist (idempotent — won't touch existing data).
 # Note: this creates tables that are missing; it does not alter existing ones.
@@ -36,14 +37,19 @@ ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    # Left False deliberately: this API uses no cookies or session auth, and
-    # browsers reject credentialed requests against a wildcard origin anyway.
+    # Authentication uses an Authorization header rather than cross-origin
+    # cookies, so credentialed CORS requests are not required.
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api/v1", tags=["registry"])
+app.include_router(
+    router,
+    prefix="/api/v1",
+    tags=["registry"],
+    dependencies=[Depends(require_actor)],
+)
 
 
 @app.get("/")

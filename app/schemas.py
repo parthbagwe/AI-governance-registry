@@ -6,7 +6,7 @@ gets messy fast once you add computed fields or hide internal columns.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -34,7 +34,9 @@ class ScoreUpdate(BaseModel):
 
 class ApprovalRequest(BaseModel):
     to_stage: ModelStage
-    approved_by: str
+    # Retained only for backwards-compatible tests and local scripts when
+    # AUTH_DISABLED=true. Authenticated deployments ignore caller-supplied text.
+    approved_by: Optional[str] = None
     comment: Optional[str] = None
 
 
@@ -88,6 +90,45 @@ class MetricResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ForecastPoint(BaseModel):
+    recorded_at: datetime
+    predicted_value: float
+    lower_bound: float
+    upper_bound: float
+
+
+class MetricForecastResponse(BaseModel):
+    metric_name: str
+    historical_points: int
+    last_observed_at: datetime
+    last_observed_value: float
+    slope_per_day: float
+    trajectory: Literal["improving", "stable", "worsening"]
+    confidence: Literal["low", "medium", "high"]
+    forecast_points: List[ForecastPoint]
+
+
+class RegulatorySignal(BaseModel):
+    authority: str
+    title: str
+    status: str
+    applicability: Literal["direct", "conditional", "watch"]
+    likely_control_scope: List[str]
+    model_impact: str
+    source_url: str
+
+
+class ModelForecastResponse(BaseModel):
+    generated_at: datetime
+    horizon_days: int
+    method: str
+    disclaimer: str
+    forecasts: List[MetricForecastResponse]
+    regulatory_as_of: str
+    readiness_priority: Literal["standard", "elevated", "urgent"]
+    regulatory_signals: List[RegulatorySignal]
 
 
 class ApprovalEventResponse(BaseModel):

@@ -17,6 +17,7 @@ TEST_DB = Path(tempfile.gettempdir()) / "ai_governance_registry_test.db"
 
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB.as_posix()}"
 os.environ["SKIP_BOOTSTRAP_SEED"] = "1"
+os.environ["AUTH_DISABLED"] = "1"
 # Left unset deliberately: monitors and scripts must talk to the in-process app
 # during tests, never to a deployed instance.
 os.environ.pop("REGISTRY_API_URL", None)

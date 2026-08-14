@@ -49,7 +49,8 @@ stating plainly rather than glossing over.
 | `fx-exposure-monitor` | **Live and real** — ECB daily reference rates, fetched at monitoring time | The rare case where the genuinely useful data is public. These are the same rates a treasury desk works from. No simulation anywhere in this model |
 | `personal-loan-credit-scorer` | **Real, static** — Kaggle "Give Me Some Credit" (2011 competition), ~150k anonymised borrowers | A real, well-known public credit benchmark. Real signal, real default labels |
 | `sme-credit-scorer` | **Synthetic**, with deliberately engineered correlations | GST filing records are not public anywhere. Simulating them is the only responsible option — not a shortcut |
-| 7 other registry entries | **Metadata only** — no trained model behind them | They exist to make the portfolio realistic in shape. A bank's registry is mostly entries you aren't personally training |
+| 21 other registry entries | **Metadata/sample scenarios** — no deployed model behind them | They exist to make the portfolio realistic in shape. A bank's registry is mostly entries you aren't personally training |
+| `demo_governance_health` on every entry | **Synthetic and explicitly labelled** | Gives every detail page enough dated history to demonstrate uncertainty-aware trajectory forecasting; it is not a production KPI |
 | The registry itself (approvals, scorecards, lineage) | **Synthetic**, necessarily | No bank publishes its internal AI governance data. There is no honest alternative here |
 
 The governance layer doesn't care which of these it's pointed at. That's the
@@ -489,7 +490,7 @@ the same principle the governance gate rests on: no actor gets a private door.
 
 ## Demo script
 
-1. **Portfolio page** — ten models, four headline numbers, filterable by risk
+1. **Portfolio page** — twenty-six models, four headline numbers, filterable by risk
    tier and stage.
 2. **Try to break it.** Open `fraud-flagger` (high risk, score ~6.25), pick
    "Live", submit. The UI warns you first; the backend then returns **403**
@@ -510,6 +511,9 @@ the same principle the governance gate rests on: no actor gets a private door.
    `fx-intraday-monitor` side by side. Same currency, same team, same
    algorithm — but one needs 7.0 to go live and the other needs 8.5, because
    only one of them has a human between its output and the money.
+8. **Forecast without false certainty.** Open any model and inspect the AI
+   trajectory panel. Observed values, projections, confidence bands, and
+   source-linked RBI/SEBI/DPDP/EU regulatory scenarios remain visually distinct.
 8. **Emergency stop.** Behind a disclosure, requires a documented reason, lands
    in the audit trail flagged red.
 
@@ -587,8 +591,8 @@ the same principle the governance gate rests on: no actor gets a private door.
   registry, but something still has to run them on a timer
 - Alembic migrations. `create_all` builds missing tables but won't alter
   existing ones, so a schema change currently means rebuilding the database
-- Authenticated identity — `approved_by` is free text, not a verified user
-- Role-based segregation of duties (three lines of defence) — designed, not
-  yet enforced end to end
+- Fine-grained role administration UI. Supabase identities and route-level
+  role checks are enforced, but roles are currently assigned through Supabase
+  user metadata (with `AUTH_ADMIN_EMAILS` as an administrator bootstrap)
 - Session-matched drift comparison for the intraday model (see "A limitation
   worth naming" above)

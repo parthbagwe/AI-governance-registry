@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Download, FlaskConical, Globe, Lock, Table2 } from "lucide-react";
 
-import { API_BASE } from "@/lib/api";
+import { API_BASE, authenticatedFetch } from "@/lib/api";
 import { humaniseField } from "@/lib/display";
 
 /**
@@ -36,10 +36,13 @@ interface DatasetInfo {
 export function DatasetPanel({ modelId }: { modelId: string }) {
   const [info, setInfo] = useState<DatasetInfo | null>(null);
   const [failed, setFailed] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/models/${modelId}/dataset/info`, { cache: "no-store" })
+    authenticatedFetch(`${API_BASE}/models/${modelId}/dataset/info`, {
+      cache: "no-store",
+    })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => !cancelled && setInfo(d))
       .catch(() => !cancelled && setFailed(true));
@@ -47,6 +50,26 @@ export function DatasetPanel({ modelId }: { modelId: string }) {
       cancelled = true;
     };
   }, [modelId]);
+
+  async function downloadSample() {
+    setDownloading(true);
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE}/models/${modelId}/dataset`,
+        { cache: "no-store" }
+      );
+      if (!response.ok) throw new Error("Dataset download failed");
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = info?.filename ?? "model-dataset.csv";
+      anchor.click();
+      URL.revokeObjectURL(href);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   // Silently absent rather than showing an empty box — a panel that only ever
   // says "nothing here" is noise on nine pages out of ten.
@@ -128,14 +151,15 @@ export function DatasetPanel({ modelId }: { modelId: string }) {
           </div>
         </div>
 
-        <a
-          href={`${API_BASE}/models/${modelId}/dataset`}
+        <button
+          onClick={downloadSample}
+          disabled={downloading}
           className="btn-ghost"
           title="Downloads a CSV — opens directly in Excel"
         >
           <Download className="h-4 w-4" />
-          Download sample
-        </a>
+          {downloading ? "Downloading..." : "Download sample"}
+        </button>
       </div>
 
       <p className="mt-4 max-w-2xl text-xs leading-relaxed text-slate-500">

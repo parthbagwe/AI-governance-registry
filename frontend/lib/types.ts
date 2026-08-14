@@ -46,6 +46,45 @@ export interface ModelMetric {
   recorded_at: string;
 }
 
+export interface ForecastPoint {
+  recorded_at: string;
+  predicted_value: number;
+  lower_bound: number;
+  upper_bound: number;
+}
+
+export interface MetricForecast {
+  metric_name: string;
+  historical_points: number;
+  last_observed_at: string;
+  last_observed_value: number;
+  slope_per_day: number;
+  trajectory: "improving" | "stable" | "worsening";
+  confidence: "low" | "medium" | "high";
+  forecast_points: ForecastPoint[];
+}
+
+export interface RegulatorySignal {
+  authority: string;
+  title: string;
+  status: string;
+  applicability: "direct" | "conditional" | "watch";
+  likely_control_scope: string[];
+  model_impact: string;
+  source_url: string;
+}
+
+export interface ModelForecast {
+  generated_at: string;
+  horizon_days: number;
+  method: string;
+  disclaimer: string;
+  forecasts: MetricForecast[];
+  regulatory_as_of: string;
+  readiness_priority: "standard" | "elevated" | "urgent";
+  regulatory_signals: RegulatorySignal[];
+}
+
 export interface ApprovalEvent {
   from_stage: ModelStage | null;
   to_stage: ModelStage;
